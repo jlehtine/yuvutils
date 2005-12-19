@@ -4,7 +4,7 @@
  *----------------------------------------------------------------------*/
 
 #define PROGNAME "yuvinfo"
-#define VERSION "0.1"
+#define VERSION "1.0"
 #define COPYRIGHT "Copyright 2005 Johannes Lehtinen"
 
 #define MAX_PLANE_COUNT 5
@@ -68,7 +68,10 @@ COPYRIGHT "\n"
 	/* Initialize internal data structures */
 	frame_length = y4m_si_get_framelength(&stream_info);
 	plane_count = y4m_si_get_plane_count(&stream_info);
-	assert(plane_count <= MAX_PLANE_COUNT);
+	if(plane_count > MAX_PLANE_COUNT) {
+		fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
+		exit(1);
+	}
 	for (i = 0; i < plane_count; i++) {
 		plane_length[i] = y4m_si_get_plane_length(&stream_info, i);
 	}

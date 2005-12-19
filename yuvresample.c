@@ -163,10 +163,7 @@ int main(int argc, char *argv[]) {
 	}
 	for (i = 0; i < plane_count; i++) {
 		plane_width[i] = y4m_si_get_plane_width(&input_si, i);
-		assert(plane_width[i] <= y4m_si_get_width(&input_si));
 		plane_height[i] = y4m_si_get_plane_height(&input_si, i);
-		assert(input_interlacing == Y4M_ILACE_NONE
-			|| !(plane_height[i] & 1));
 		if (output_interlacing != Y4M_ILACE_NONE
 			&& plane_height[i] & 1) {
 			fputs(PROGNAME
@@ -175,7 +172,8 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 		plane_length[i] = y4m_si_get_plane_length(&input_si, i);
-		if (plane_length[i] != plane_width[i] * plane_height[i]) {
+		if (plane_width[i] > y4m_si_get_width(&input_si)
+			|| plane_length[i] != plane_width[i] * plane_height[i]) {
 			fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
 			exit(1);
 		}
@@ -311,12 +309,12 @@ COPYRIGHT "\n"
 "             p - progressive\n"
 "             t - top field first\n"
 "             b - bottom field first\n"
-"  -I I    input interlacing mode (overrides source stream info)\n"
-"  -m M    source frame selection mode (defaults to 'a')\n"
+"  -I I     input interlacing mode (overrides source stream info)\n"
+"  -m M     source frame selection mode (defaults to 'a')\n"
 "             c - the closest input frame/field\n"
 "             a - weighted average of the two closest input frames/fields\n"
-"  -v      verbose operation\n"
-"  -d      enable debug output\n",
+"  -v       verbose operation\n"
+"  -d       enable debug output\n",
 					stdout);
 				exit(0);
 			case 'd':
