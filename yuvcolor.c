@@ -14,9 +14,7 @@
 
 #define OPER_WHITEBALANCE 1
 #define OPER_LCONTRAST 2
-#if 0
 #define OPER_CCONTRAST 4
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -227,11 +225,9 @@ COPYRIGHT "\n"
 					exit(1);
 				}
 				break;
-#if 0
 			case 'C':
 				oper |= OPER_CCONTRAST;
 				break;
-#endif
 			case 'c':
 				oper |= OPER_LCONTRAST;
 				break;
@@ -257,8 +253,20 @@ COPYRIGHT "\n"
 				fputs(PROGNAME ": error: unknown option\n", stderr);
 				exit(1);
 		}
+	}	
+	
+	/* Error if no-op */
+	if (!oper) {
+		fputs(PROGNAME ": error: no operation specified (try -h)\n", stderr);
+		exit(1);
 	}
 	
+	/* Color contrast enhancement will adjust white balance */
+	if ((oper & OPER_WHITEBALANCE) && (oper & OPER_CCONTRAST)) {
+		fputs(PROGNAME ": warning: color contrast enhancement will also adjust white balance\n", stderr);
+		oper &= ~(OPER_WHITEBALANCE);
+	}
+
 	/* Print configuration if verbose */
 	if (verbose) {
 		if (oper & OPER_WHITEBALANCE) {
@@ -267,23 +275,15 @@ COPYRIGHT "\n"
 		if (oper & OPER_LCONTRAST) {
 			fputs(PROGNAME ": conf: enhance luminance contrast\n", stderr);
 		}
-#if 0
 		if (oper & OPER_CCONTRAST) {
 			fputs(PROGNAME ": conf: enhance color contrast\n", stderr);
 		}
-#endif
 		fprintf(stderr, PROGNAME ": conf: buffer size %u frames\n",
 			buffer_size);
 		if (only_half) {
 			fputs(PROGNAME ": conf: adjust only the first half of each frame\n",
 				stderr);
 		}
-	}
-	
-	/* Error if no-op */
-	if (!oper) {
-		fputs(PROGNAME ": error: no operation specified (try -h)\n", stderr);
-		exit(1);
 	}
 }
 
@@ -360,7 +360,7 @@ static void analyze_buffered_frame(int i) {
 		unsigned long sum = 0;
 			
 		if ((j == 0 && (oper & OPER_LCONTRAST))
-			|| (j > 0 && (oper & OPER_WHITEBALANCE))) {
+			|| (j > 0 && (oper & (OPER_WHITEBALANCE | OPER_CCONTRAST)))) {
 			p = (input_planes[i])[j];
 			for (k = plane_length[j]; k; k--) {
 				sum += *p;
@@ -381,63 +381,60 @@ static void adjust_frame(int i) {
 	int j, k;
 	int y;
 	uint8_t *p;
-	int wboff[3];
-	
-	if (oper & OPER_LCONTRAST) {
-		double avg;
-		double a, b;
-		uint8_t table[256];
 
-		avg = (double) avg_sum[0] / buffer_count;
-#if 0		
-		a = (double) (127 - yvmiddle) / (yvmiddle * (yvmiddle - 255));
-#else
-		a = (double) (127 - avg) / (avg * (avg - 255));
-#endif
-		if (a < (double) -1 / 255) {
-			a = (double) -1 / 255;
-		} else if (a > (double) 1 / 255) {
-			a = (double) 1 / 255;
-		}
-		b = 1 - 255 * a;
-		
-		for (j = 0; j < 256; j++) {
-			double v = a * (j * j) + b * j;
-			if (v < 0) {
-				v = 0;
-			} else if (v > 255) {
-				v = 255;
+	/* Contrast enhancements */
+	for (j = 0; j <= 2; j++) {	
+		if ((j == 0 && (oper & OPER_LCONTRAST))
+			|| (j > 0 && (oper & OPER_CCONTRAST))) {
+			double avg;
+			double a, b;
+			uint8_t table[256];
+
+			avg = (double) avg_sum[j] / buffer_count;
+			a = (double) (128 - avg) / (avg * (avg - 255));
+			if (a < (double) -1 / 255) {
+				a = (double) -1 / 255;
+			} else if (a > (double) 1 / 255) {
+				a = (double) 1 / 255;
 			}
-			table[j] = rint(v);
-		}
-		if (verbose & VERBOSE_DEBUG) {
-			fprintf(stderr, PROGNAME ": debug: output frame %u average luminance %u adjustment y' = %.6f * y^2 + %.3f * y\n",
-				output_frame_count, (int) rint(avg), a, b);
-		}
-		p = (input_planes[i])[0];
-		for (k = only_half ? plane_length[0] / 2 : plane_length[0]; k; k--) {
-			*p = table[*p];
-			p++;
+			b = 1 - 255 * a;
+		
+			for (k = 0; k < 256; k++) {
+				double v = a * (k * k) + b * k;
+				if (v < (j == 0 ? 0 : 16)) {
+					v = (j == 0 ? 0 : 16);
+				} else if (v > (j == 0 ? 255 : 240)) {
+					v = (j == 0 ? 255 : 240);
+				}
+				table[k] = rint(v);
+			}
+			if (verbose & VERBOSE_DEBUG) {
+				char v = (j == 0 ? 'y' : (j == 1 ? 'u' : 'v'));
+				fprintf(stderr, PROGNAME ": debug: output frame %u average %c %u adjustment %c' = %.6f * %c^2 + %.3f * %c\n",
+					output_frame_count, v, (int) rint(avg), v, a, v, b, v);
+			}
+			p = (input_planes[i])[j];
+			for (k = only_half ? plane_length[j] / 2 : plane_length[j]; k; k--) {
+				*p = table[*p];
+				p++;
+			}
 		}
 	}
-	for (j = 1; j <= 2; j++) {
-		if (oper & OPER_WHITEBALANCE) {
-			wboff[j] = -((avg_sum[j] + buffer_count / 2) / buffer_count - 128);
-		} else {
-			wboff[j] = 0;
-		}
-	}
+	
+	/* White balance adjustment */
 	if (oper & OPER_WHITEBALANCE) {
 		for (j = 1; j <= 2; j++) {
+			int wboff = -((avg_sum[j] + buffer_count / 2) / buffer_count - 128);
+			
 			if (verbose & VERBOSE_DEBUG) {
 				if (oper & OPER_WHITEBALANCE) {
 					fprintf(stderr, PROGNAME ": debug: output frame %u white balance adjustment %c' = %c %c %u\n",
-						output_frame_count, j == 1 ? 'u' : 'v', j == 1 ? 'u' : 'v', wboff[j] < 0 ? '-' : '+', abs(wboff[j]));
+						output_frame_count, j == 1 ? 'u' : 'v', j == 1 ? 'u' : 'v', wboff < 0 ? '-' : '+', abs(wboff));
 				}
 			}
 			p = (input_planes[i])[j];
 			for (k = only_half ? plane_length[j] / 2 : plane_length[j]; k; k--) {
-				*p = uv_limit(*p + wboff[j]);
+				*p = uv_limit(*p + wboff);
 				p++;
 			}
 		}
