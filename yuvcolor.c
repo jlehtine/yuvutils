@@ -19,19 +19,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <unistd.h>
 #include <assert.h>
 #include <yuv4mpeg.h>
 
 int oper = 0;
 int only_half = 0;
+int show_yprof = 0;
 y4m_stream_info_t stream_info;
 int plane_count;
 int plane_width[MAX_PLANE_COUNT];
 int plane_height[MAX_PLANE_COUNT];
 int plane_length[MAX_PLANE_COUNT];
-int x_shift[2];
-int y_shift[2];
+int x_shift[MAX_PLANE_COUNT];
+int y_shift[MAX_PLANE_COUNT];
 uint8_t *(*input_planes)[MAX_PLANE_COUNT];
 y4m_frame_info_t *input_frame_infos;
 int (*favg)[MAX_PLANE_COUNT];
@@ -40,6 +42,9 @@ int (*fmin)[MAX_PLANE_COUNT];
 int (*fmax)[MAX_PLANE_COUNT];
 int min[MAX_PLANE_COUNT];
 int max[MAX_PLANE_COUNT];
+unsigned long (*yvcount)[256];
+unsigned long yvcount_sum[256];
+int yvmiddle;
 uint8_t *output_planes[MAX_PLANE_COUNT];
 int buffer_count = 0;
 int buffer_head = 0;
@@ -89,10 +94,15 @@ int main(int argc, char *argv[]) {
 	favg = malloc(sizeof(int [MAX_PLANE_COUNT]) * buffer_size);
 	fmin = malloc(sizeof(int [MAX_PLANE_COUNT]) * buffer_size);
 	fmax = malloc(sizeof(int [MAX_PLANE_COUNT]) * buffer_size);
+	yvcount = malloc(sizeof(unsigned long [256]) * buffer_size);
 	if (input_planes == NULL || input_frame_infos == NULL
-		|| favg == NULL || fmin == NULL || fmax == NULL) {
+		|| favg == NULL || fmin == NULL || fmax == NULL
+		|| yvcount == NULL) {
 		fputs(PROGNAME ": error: memory allocation failed\n", stderr);
 		exit(1);
+	}
+	for (i = 0; i < 256; i++) {
+		yvcount_sum[i] = 0;
 	}
 	for (i = 0; i < buffer_size; i++) {
 		y4m_init_frame_info(input_frame_infos + i);
@@ -115,10 +125,10 @@ int main(int argc, char *argv[]) {
 		if (i >= 1 && i <= 2) {
 			switch (plane_width[0] / plane_width[i]) {
 				case 1:
-					x_shift[i-1] = 0;
+					x_shift[i] = 0;
 					break;
 				case 2:
-					x_shift[i-1] = 1;
+					x_shift[i] = 1;
 					break;
 				default:
 					fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
@@ -126,10 +136,10 @@ int main(int argc, char *argv[]) {
 			}
 			switch (plane_height[0] / plane_height[i]) {
 				case 1:
-					y_shift[i-1] = 0;
+					y_shift[i] = 0;
 					break;
 				case 2:
-					y_shift[i-1] = 1;
+					y_shift[i] = 1;
 					break;
 				default:
 					fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
@@ -192,7 +202,7 @@ static void parse_options(int argc, char *argv[]) {
 	int c;
 
 	/* Read options */	
-	while ((c = getopt(argc, argv, "b:CcdhHvw")) != -1) {
+	while ((c = getopt(argc, argv, "b:CcdhHpvw")) != -1) {
 		switch (c) {
 			case 'h':
 				fputs(
@@ -213,6 +223,7 @@ COPYRIGHT "\n"
 "  -b NUM   use information from up to NUM surrounding frames to adjust\n"
 "             the white balance of a frame (default is 30 frames)\n"
 "  -H       adjust only the first half of each frame (for comparison)\n"
+"  -p       show luminance profile as part of the output stream\n"
 "  -v       verbose operation\n"
 "  -d       enable debug output\n",
 					stdout);
@@ -235,6 +246,9 @@ COPYRIGHT "\n"
 				break;
 			case 'H':
 				only_half = 1;
+				break;
+			case 'p':
+				show_yprof = 1;
 				break;
 			case 'v':
 				verbose |= 1;
@@ -286,6 +300,8 @@ static int read_frame(void) {
 	if ((i = y4m_read_frame(STDIN_FILENO, &stream_info,
 		input_frame_infos + buffer_head, input_planes[buffer_head]))
 		== Y4M_OK) {
+		unsigned long n;
+		
 		buffer_count++;
 		if (verbose & VERBOSE_DEBUG) {
 			fprintf(stderr, PROGNAME
@@ -296,6 +312,15 @@ static int read_frame(void) {
 		for (i = 0; i < plane_count; i++) {
 			avg_sum[i] += (favg[buffer_head])[i];
 		}
+		n = 0;
+		for (i = 0; i < 256; i++) {
+			yvcount_sum[i] += (yvcount[buffer_head])[i];
+			n += (yvcount[buffer_head])[i];
+		}
+		for (n = 0, i = 0; i < 256 && n < (unsigned long) buffer_count * plane_width[0] * plane_height[0] / 2; i++) {
+			n += yvcount_sum[i];
+		}
+		yvmiddle = i;
 		for (i = 0; i < plane_count; i++) {
 			if ((fmin[buffer_head])[i] < min[i]) {
 				min[i] = (fmin[buffer_head])[i];
@@ -332,6 +357,9 @@ static int read_frame(void) {
 static void step_buffer(void) {
 	int i, j, k;
 	
+	for (j = 0; j < 256; j++) {
+		yvcount_sum[j] -= (yvcount[buffer_tail])[j];
+	}
 	for (i = 0; i < plane_count; i++) {
 		avg_sum[i] -= (favg[buffer_tail])[i];
 		if (min[i] >= (fmin[buffer_tail])[i]) {
@@ -382,14 +410,15 @@ static void step_buffer(void) {
 }
 
 static void analyze_buffered_frame(int i) {
-	unsigned long sum[MAX_PLANE_COUNT];
 	int j, k;
 	uint8_t *p;
 
 	for (j = 0; j < plane_count; j++) {
-		sum[j] = 0;
 		(fmin[i])[j] = 255;
 		(fmax[i])[j] = 0;
+	}
+	for (j = 0; j < 256; j++) {
+		(yvcount[i])[j] = 0;
 	}
 	if (oper & OPER_LCONTRAST) {
 		p = (input_planes[i])[0];
@@ -400,6 +429,7 @@ static void analyze_buffered_frame(int i) {
 			if (*p > (fmax[i])[0]) {
 				(fmax[i])[0] = *p;
 			}
+			(yvcount[i])[*p]++;
 			p++;
 		}
 		if (verbose & VERBOSE_DEBUG) {
@@ -409,10 +439,12 @@ static void analyze_buffered_frame(int i) {
 	}	
 	if (oper & (OPER_WHITEBALANCE | OPER_CCONTRAST)) {
 		for (j = 1; j <= 2; j++) {
+			unsigned long sum = 0;
+			
 			p = (input_planes[i])[j];
 			for (k = plane_length[j]; k; k--) {
 				if (oper & OPER_WHITEBALANCE) {
-					sum[j] += *p;
+					sum += *p;
 				}
 				if (oper & OPER_CCONTRAST) {
 					if (*p < (fmin[i])[j]) {
@@ -424,7 +456,7 @@ static void analyze_buffered_frame(int i) {
 				}
 				p++;
 			}
-			(favg[i])[j] = (sum[j] + plane_length[j] / 2) / plane_length[j];
+			(favg[i])[j] = (sum + plane_length[j] / 2) / plane_length[j];
 			if (verbose & VERBOSE_DEBUG) {
 				if (oper & OPER_CCONTRAST) {
 					fprintf(stderr, PROGNAME ": debug: input frame %u %c range [%u ... %u]\n",
@@ -441,20 +473,31 @@ static void analyze_buffered_frame(int i) {
 
 static void adjust_frame(int i) {
 	int j, k;
+	int y;
 	uint8_t *p;
 	int wboff[3];
 	
 	if (oper & OPER_LCONTRAST) {
-		int off = -min[0];
-		int div = max[0] - min[0];
+		double a = (double) (127 - yvmiddle) / (yvmiddle * (yvmiddle - 255));
+		double b = 1 - 255 * a;
+		uint8_t table[256];
 		
+		for (j = 0; j < 256; j++) {
+			double v = a * (j * j) + b * j;
+			if (v < 0) {
+				v = 0;
+			} else if (v > 255) {
+				v = 255;
+			}
+			table[j] = v;
+		}
 		if (verbose & VERBOSE_DEBUG) {
-			fprintf(stderr, PROGNAME ": debug: output frame %u luminance adjustment y' = (y %c %u) * 255 / %u\n",
-				output_frame_count, off < 0 ? '-' : '+', abs(off), div);
+			fprintf(stderr, PROGNAME ": debug: output frame %u median luminance %u adjustment y' = %.3f * y^2 + %.3f * y\n",
+				output_frame_count, yvmiddle, a, b);
 		}
 		p = (input_planes[i])[0];
 		for (k = only_half ? plane_length[0] / 2 : plane_length[0]; k; k--) {
-			*p = (uint8_t) (((int) *p + off) * 255 / div);
+			*p = table[*p];
 			p++;
 		}
 	}
@@ -490,6 +533,33 @@ static void adjust_frame(int i) {
 					*p = uv_limit(*p + wboff[j]);
 				}
 				p++;
+			}
+		}
+	}
+	
+	/* Include luminance profile in output if requested */
+	if (show_yprof) {
+		unsigned long max;
+		
+		for (y = -100; y < 0; y++) {
+			p = (input_planes[i])[0] + (plane_height[0] + y) * plane_width[0]
+				+ (plane_width[0] - 256) / 2;
+			for (k = 256; k; k--) {
+				*p = *p >> 2;
+				p++;
+			}
+		}
+		max = 0;
+		for (k = 0; k < 256; k++) {
+			if ((yvcount[i])[k] > max) {
+				max = (yvcount[i])[k];
+			}
+		}
+		for (k = 0; k < 256; k++) {
+			int h = (yvcount[i])[k] * 100 / max;
+			for (y = plane_height[0] - h; y < plane_height[0]; y++) {
+				*((input_planes[i])[0] + y * plane_width[0]
+					+ (plane_width[0] - 256) / 2 + k) = 255;
 			}
 		}
 	}
