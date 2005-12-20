@@ -14,7 +14,9 @@
 
 #define OPER_WHITEBALANCE 1
 #define OPER_LCONTRAST 2
+#if 0
 #define OPER_CCONTRAST 4
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,13 +40,8 @@ uint8_t *(*input_planes)[MAX_PLANE_COUNT];
 y4m_frame_info_t *input_frame_infos;
 int (*favg)[MAX_PLANE_COUNT];
 int avg_sum[MAX_PLANE_COUNT];
-int (*fmin)[MAX_PLANE_COUNT];
-int (*fmax)[MAX_PLANE_COUNT];
-int min[MAX_PLANE_COUNT];
-int max[MAX_PLANE_COUNT];
 unsigned long (*yvcount)[256];
 unsigned long yvcount_sum[256];
-int yvmiddle;
 uint8_t *output_planes[MAX_PLANE_COUNT];
 int buffer_count = 0;
 int buffer_head = 0;
@@ -92,12 +89,9 @@ int main(int argc, char *argv[]) {
 	input_planes = malloc(sizeof(uint8_t *[MAX_PLANE_COUNT]) * buffer_size);
 	input_frame_infos = malloc(sizeof(y4m_frame_info_t) * buffer_size);
 	favg = malloc(sizeof(int [MAX_PLANE_COUNT]) * buffer_size);
-	fmin = malloc(sizeof(int [MAX_PLANE_COUNT]) * buffer_size);
-	fmax = malloc(sizeof(int [MAX_PLANE_COUNT]) * buffer_size);
 	yvcount = malloc(sizeof(unsigned long [256]) * buffer_size);
 	if (input_planes == NULL || input_frame_infos == NULL
-		|| favg == NULL || fmin == NULL || fmax == NULL
-		|| yvcount == NULL) {
+		|| favg == NULL /*|| yvcount == NULL*/) {
 		fputs(PROGNAME ": error: memory allocation failed\n", stderr);
 		exit(1);
 	}
@@ -154,8 +148,6 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		avg_sum[i] = 0;
-		min[i] = 255;
-		max[i] = 0;
 	}
 	
 	/* Write output stream header */
@@ -235,9 +227,11 @@ COPYRIGHT "\n"
 					exit(1);
 				}
 				break;
+#if 0
 			case 'C':
 				oper |= OPER_CCONTRAST;
 				break;
+#endif
 			case 'c':
 				oper |= OPER_LCONTRAST;
 				break;
@@ -273,9 +267,11 @@ COPYRIGHT "\n"
 		if (oper & OPER_LCONTRAST) {
 			fputs(PROGNAME ": conf: enhance luminance contrast\n", stderr);
 		}
+#if 0
 		if (oper & OPER_CCONTRAST) {
 			fputs(PROGNAME ": conf: enhance color contrast\n", stderr);
 		}
+#endif
 		fprintf(stderr, PROGNAME ": conf: buffer size %u frames\n",
 			buffer_size);
 		if (only_half) {
@@ -300,7 +296,6 @@ static int read_frame(void) {
 	if ((i = y4m_read_frame(STDIN_FILENO, &stream_info,
 		input_frame_infos + buffer_head, input_planes[buffer_head]))
 		== Y4M_OK) {
-		unsigned long n;
 		
 		buffer_count++;
 		if (verbose & VERBOSE_DEBUG) {
@@ -312,33 +307,9 @@ static int read_frame(void) {
 		for (i = 0; i < plane_count; i++) {
 			avg_sum[i] += (favg[buffer_head])[i];
 		}
-		n = 0;
-		for (i = 0; i < 256; i++) {
-			yvcount_sum[i] += (yvcount[buffer_head])[i];
-			n += (yvcount[buffer_head])[i];
-		}
-		for (n = 0, i = 0; i < 256 && n < (unsigned long) buffer_count * plane_width[0] * plane_height[0] / 2; i++) {
-			n += yvcount_sum[i];
-		}
-		yvmiddle = i;
-		for (i = 0; i < plane_count; i++) {
-			if ((fmin[buffer_head])[i] < min[i]) {
-				min[i] = (fmin[buffer_head])[i];
-				if ((verbose & VERBOSE_DEBUG) && i <= 2) {
-					fprintf(stderr, PROGNAME
-						": debug: new min(%c) = %u\n",
-						(i == 0 ? 'y' : (i == 1 ? 'u' : 'v')),
-						min[i]);
-				}
-			}
-			if ((fmax[buffer_head])[i] > max[i]) {
-				max[i] = (fmax[buffer_head])[i];
-				if ((verbose & VERBOSE_DEBUG) && i <= 2) {
-					fprintf(stderr, PROGNAME
-						": debug: new max(%c) = %u\n",
-						(i == 0 ? 'y' : (i == 1 ? 'u' : 'v')),
-						max[i]);
-				}
+		if (show_yprof) {
+			for (i = 0; i < 256; i++) {
+				yvcount_sum[i] += (yvcount[buffer_head])[i];
 			}
 		}
 		if (++buffer_head >= buffer_size) {
@@ -355,53 +326,15 @@ static int read_frame(void) {
 }
 
 static void step_buffer(void) {
-	int i, j, k;
-	
-	for (j = 0; j < 256; j++) {
-		yvcount_sum[j] -= (yvcount[buffer_tail])[j];
+	int i;
+
+	if (show_yprof) {
+		for (i = 0; i < 256; i++) {
+			yvcount_sum[i] -= (yvcount[buffer_tail])[i];
+		}
 	}
 	for (i = 0; i < plane_count; i++) {
 		avg_sum[i] -= (favg[buffer_tail])[i];
-		if (min[i] >= (fmin[buffer_tail])[i]) {
-			int oldmin = min[i];
-			
-			min[i] = 255;
-			j = buffer_tail;
-			for (k = buffer_count - 1; k; k--) {
-				if (++j >= buffer_size) {
-					j = 0;
-				}
-				if ((fmin[j])[i] < min[i]) {
-					min[i] = (fmin[j])[i];
-				}
-			}
-			if ((verbose & VERBOSE_DEBUG) && i <= 2 && oldmin < min[i]) {
-				fprintf(stderr, PROGNAME
-					": debug: new min(%c) = %u\n",
-					(i == 0 ? 'y' : (i == 1 ? 'u' : 'v')),
-					min[i]);
-			}
-		}
-		if (max[i] <= (fmin[buffer_tail])[i]) {
-			int oldmax = max[i];
-			
-			max[i] = 0;
-			j = buffer_tail;
-			for (k = buffer_count - 1; k; k--) {
-				if (++j >= buffer_size) {
-					j = 0;
-				}
-				if ((fmax[j])[i] > max[i]) {
-					max[i] = (fmax[j])[i];
-				}
-			}			
-			if ((verbose & VERBOSE_DEBUG) && i <= 2 && oldmax > max[i]) {
-				fprintf(stderr, PROGNAME
-					": debug: new max(%c) = %u\n",
-					(i == 0 ? 'y' : (i == 1 ? 'u' : 'v')),
-					max[i]);
-			}
-		}
 	}
 	if (++buffer_tail >= buffer_size) {
 		buffer_tail = 0;
@@ -413,58 +346,31 @@ static void analyze_buffered_frame(int i) {
 	int j, k;
 	uint8_t *p;
 
-	for (j = 0; j < plane_count; j++) {
-		(fmin[i])[j] = 255;
-		(fmax[i])[j] = 0;
-	}
-	for (j = 0; j < 256; j++) {
-		(yvcount[i])[j] = 0;
-	}
-	if (oper & OPER_LCONTRAST) {
+	if (show_yprof) {
+		for (j = 0; j < 256; j++) {
+			(yvcount[i])[j] = 0;
+		}
 		p = (input_planes[i])[0];
 		for (k = plane_length[0]; k; k--) {
-			if (*p < (fmin[i])[0]) {
-				(fmin[i])[0] = *p;
-			}
-			if (*p > (fmax[i])[0]) {
-				(fmax[i])[0] = *p;
-			}
 			(yvcount[i])[*p]++;
 			p++;
 		}
-		if (verbose & VERBOSE_DEBUG) {
-			fprintf(stderr, PROGNAME ": debug: input frame %u y range [%u ... %u]\n",
-				input_frame_count, (int) (fmin[i])[0], (int) (fmax[i])[0]);
-		}
-	}	
-	if (oper & (OPER_WHITEBALANCE | OPER_CCONTRAST)) {
-		for (j = 1; j <= 2; j++) {
-			unsigned long sum = 0;
+	}
+	for (j = 0; j <= 2; j++) {
+		unsigned long sum = 0;
 			
+		if ((j == 0 && (oper & OPER_LCONTRAST))
+			|| (j > 0 && (oper & OPER_WHITEBALANCE))) {
 			p = (input_planes[i])[j];
 			for (k = plane_length[j]; k; k--) {
-				if (oper & OPER_WHITEBALANCE) {
-					sum += *p;
-				}
-				if (oper & OPER_CCONTRAST) {
-					if (*p < (fmin[i])[j]) {
-						(fmin[i])[j] = *p;
-					}
-					if (*p > (fmax[i])[j]) {
-						(fmax[i])[j] = *p;
-					}
-				}
+				sum += *p;
 				p++;
 			}
 			(favg[i])[j] = (sum + plane_length[j] / 2) / plane_length[j];
 			if (verbose & VERBOSE_DEBUG) {
-				if (oper & OPER_CCONTRAST) {
-					fprintf(stderr, PROGNAME ": debug: input frame %u %c range [%u ... %u]\n",
-						input_frame_count, j == 1 ? 'u' : 'v', (int) (fmin[i])[j], (fmax[i])[j]);
-				}
 				if (oper & OPER_WHITEBALANCE) {
 					fprintf(stderr, PROGNAME ": debug: input frame %u avg(%c) = %u\n",
-						input_frame_count, j == 1 ? 'u' : 'v', (int) (favg[i])[j]);
+						input_frame_count, (j == 0 ? 'y' : (j == 1 ? 'u' : 'v')), (int) (favg[i])[j]);
 				}
 			}
 		}
@@ -478,9 +384,22 @@ static void adjust_frame(int i) {
 	int wboff[3];
 	
 	if (oper & OPER_LCONTRAST) {
-		double a = (double) (127 - yvmiddle) / (yvmiddle * (yvmiddle - 255));
-		double b = 1 - 255 * a;
+		double avg;
+		double a, b;
 		uint8_t table[256];
+
+		avg = (double) avg_sum[0] / buffer_count;
+#if 0		
+		a = (double) (127 - yvmiddle) / (yvmiddle * (yvmiddle - 255));
+#else
+		a = (double) (127 - avg) / (avg * (avg - 255));
+#endif
+		if (a < (double) -1 / 255) {
+			a = (double) -1 / 255;
+		} else if (a > (double) 1 / 255) {
+			a = (double) 1 / 255;
+		}
+		b = 1 - 255 * a;
 		
 		for (j = 0; j < 256; j++) {
 			double v = a * (j * j) + b * j;
@@ -489,11 +408,11 @@ static void adjust_frame(int i) {
 			} else if (v > 255) {
 				v = 255;
 			}
-			table[j] = v;
+			table[j] = rint(v);
 		}
 		if (verbose & VERBOSE_DEBUG) {
-			fprintf(stderr, PROGNAME ": debug: output frame %u median luminance %u adjustment y' = %.3f * y^2 + %.3f * y\n",
-				output_frame_count, yvmiddle, a, b);
+			fprintf(stderr, PROGNAME ": debug: output frame %u average luminance %u adjustment y' = %.6f * y^2 + %.3f * y\n",
+				output_frame_count, (int) rint(avg), a, b);
 		}
 		p = (input_planes[i])[0];
 		for (k = only_half ? plane_length[0] / 2 : plane_length[0]; k; k--) {
@@ -508,30 +427,17 @@ static void adjust_frame(int i) {
 			wboff[j] = 0;
 		}
 	}
-	if (oper & (OPER_WHITEBALANCE | OPER_CCONTRAST)) {
+	if (oper & OPER_WHITEBALANCE) {
 		for (j = 1; j <= 2; j++) {
-			int off = -uv_limit(min[j] + wboff[j]);
-			int div = uv_limit(max[j] + wboff[j])
-				- uv_limit(min[j] + wboff[j]);
-				
 			if (verbose & VERBOSE_DEBUG) {
 				if (oper & OPER_WHITEBALANCE) {
 					fprintf(stderr, PROGNAME ": debug: output frame %u white balance adjustment %c' = %c %c %u\n",
 						output_frame_count, j == 1 ? 'u' : 'v', j == 1 ? 'u' : 'v', wboff[j] < 0 ? '-' : '+', abs(wboff[j]));
 				}
-				if (oper & OPER_CCONTRAST) {
-					fprintf(stderr, PROGNAME ": debug: output frame %u chrominance adjustment %c' = (%c %c %u) * 224 / %u + 16\n",
-						output_frame_count, j == 1 ? 'u' : 'v', j == 1 ? 'u' : 'v', off < 0 ? '-' : '+', abs(off), div);
-				}
 			}
 			p = (input_planes[i])[j];
 			for (k = only_half ? plane_length[j] / 2 : plane_length[j]; k; k--) {
-				
-				if (oper & OPER_CCONTRAST) {
-					*p = (uv_limit(*p + wboff[j]) + off) * 224 / div + 16;
-				} else {
-					*p = uv_limit(*p + wboff[j]);
-				}
+				*p = uv_limit(*p + wboff[j]);
 				p++;
 			}
 		}
