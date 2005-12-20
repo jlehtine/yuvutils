@@ -390,27 +390,43 @@ static void adjust_frame(int i) {
 			double a, b;
 			uint8_t table[256];
 
-			avg = (double) avg_sum[j] / buffer_count;
-			a = (double) (128 - avg) / (avg * (avg - 255));
-			if (a < (double) -1 / 255) {
-				a = (double) -1 / 255;
-			} else if (a > (double) 1 / 255) {
-				a = (double) 1 / 255;
+			if (j == 0) {
+				avg = (double) avg_sum[j] / buffer_count / 255;
+			} else {
+				avg = ((double) avg_sum[j] / buffer_count - 16) / 224;
 			}
-			b = 1 - 255 * a;
-		
+			if (avg < 0.01) {
+				avg = 0.01;
+			} else if (avg > 0.99) {
+				avg = 0.99;
+			}
+			a = (0.5 - avg) / (avg * (avg - 1));
+			if (a < -1) {
+				a = -1;
+			} else if (a > 1) {
+				a = 1;
+			}
+			b = 1 - a;		
 			for (k = 0; k < 256; k++) {
-				double v = a * (k * k) + b * k;
-				if (v < (j == 0 ? 0 : 16)) {
-					v = (j == 0 ? 0 : 16);
-				} else if (v > (j == 0 ? 255 : 240)) {
-					v = (j == 0 ? 255 : 240);
+				double kn;
+				double v;
+
+				if (j == 0) {
+					kn = (double) k / 255;
+				} else {
+					kn = ((double) k - 16) / 224;
+				}
+				v = a * (kn * kn) + b * kn;
+				if (j == 0) {
+					v *= 255;
+				} else {
+					v = 224 * v + 16;
 				}
 				table[k] = rint(v);
 			}
 			if (verbose & VERBOSE_DEBUG) {
 				char v = (j == 0 ? 'y' : (j == 1 ? 'u' : 'v'));
-				fprintf(stderr, PROGNAME ": debug: output frame %u average %c %u adjustment %c' = %.6f * %c^2 + %.3f * %c\n",
+				fprintf(stderr, PROGNAME ": debug: output frame %u average %c %u adjustment %c' = %.3f * %c^2 + %.3f * %c\n",
 					output_frame_count, v, (int) rint(avg), v, a, v, b, v);
 			}
 			p = (input_planes[i])[j];
