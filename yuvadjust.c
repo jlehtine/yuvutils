@@ -1,10 +1,10 @@
 /*------------------------------------------------------------------------
- * yuvwhitebalance, adjust white balance of YUV4MPEG streams
+ * yuvadjust, adjust white balance and contrast of YUV4MPEG streams
  * Copyright 2005 Johannes Lehtinen
  *----------------------------------------------------------------------*/
 
-#define PROGNAME "yuvcolor"
-#define VERSION "0.1"
+#define PROGNAME "yuvadjust"
+#define VERSION "1.0"
 #define COPYRIGHT "Copyright 2005 Johannes Lehtinen"
 
 #define DEFAULT_BUFFER_SIZE 30
@@ -196,7 +196,7 @@ static void parse_options(int argc, char *argv[]) {
 		switch (c) {
 			case 'h':
 				fputs(
-PROGNAME " " VERSION " - adjust white balance of YUV4MPEG streams\n"
+PROGNAME " " VERSION " - adjust white balance and contrast of YUV4MPEG streams\n"
 COPYRIGHT "\n"
 "\n"
 "Adjust the while balance and/or contrast of a YUV4MPEG stream. The source\n"
@@ -206,8 +206,8 @@ COPYRIGHT "\n"
 "usage: " PROGNAME " <command>... [<option>...]\n"
 "commands:\n"
 "  -w       adjust white balance\n"
-"  -c       enhance contrast by maximizing luminance scale\n"
-"  -C       enhance color contrast by maximizing chrominance scale\n"
+"  -c       enhance luminance contrast\n"
+"  -C       adjust white balance and enhance chromatic contrast\n"
 "options:\n"
 "  -h       print this help text and exit\n"
 "  -b NUM   use information from up to NUM surrounding frames to adjust\n"

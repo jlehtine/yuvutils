@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -O2 -Wall -pedantic
 CPPFLAGS = -I/usr/local/include/mjpegtools
 
-BINARIES = yuvresample yuvinfo yuvcolor
+BINARIES = yuvresample yuvinfo yuvadjust
 
 all: $(BINARIES)
 
@@ -16,7 +16,7 @@ yuvresample: yuvresample.o
 yuvinfo: yuvinfo.o
 	$(CC) -o $@ $^ -lmjpegutils
 
-yuvcolor: yuvcolor.o
+yuvadjust: yuvadjust.o
 	$(CC) -o $@ $^ -lmjpegutils
 
 .PHONY: all clean
