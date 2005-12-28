@@ -12,8 +12,6 @@
 
 #define VERBOSE_DEBUG 2
 
-#define MAX_PLANE_COUNT 5
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,11 +30,11 @@ y4m_stream_info_t input_si;
 y4m_stream_info_t output_si;
 y4m_frame_info_t fi;
 int plane_count;
-int plane_width[MAX_PLANE_COUNT];
-int plane_height[MAX_PLANE_COUNT];
-int plane_length[MAX_PLANE_COUNT];
-uint8_t *input_planes[2][MAX_PLANE_COUNT];
-uint8_t *output_planes[MAX_PLANE_COUNT];
+int plane_width[Y4M_MAX_NUM_PLANES];
+int plane_height[Y4M_MAX_NUM_PLANES];
+int plane_length[Y4M_MAX_NUM_PLANES];
+uint8_t *input_planes[2][Y4M_MAX_NUM_PLANES];
+uint8_t *output_planes[Y4M_MAX_NUM_PLANES];
 uint8_t *work_lines[2];
 int input_frame_time;
 int output_frame_time;
@@ -157,7 +155,7 @@ int main(int argc, char *argv[]) {
 	
 	/* Initialize internal data structures */
 	plane_count = y4m_si_get_plane_count(&input_si);
-	if (plane_count > MAX_PLANE_COUNT) {
+	if (plane_count > Y4M_MAX_NUM_PLANES) {
 		fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
 		exit(1);
 	}

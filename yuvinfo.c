@@ -7,8 +7,6 @@
 #define VERSION "1.0"
 #define COPYRIGHT "Copyright 2005 Johannes Lehtinen"
 
-#define MAX_PLANE_COUNT 5
-
 #define DISPLAY_ALL 0
 #define DISPLAY_LENGTH 1
 
@@ -26,8 +24,8 @@ int main(int argc, char *argv[]) {
 	y4m_frame_info_t frame_info;
 	int frame_length;
 	int plane_count;
-	int plane_length[MAX_PLANE_COUNT];
-	uint8_t *planes[MAX_PLANE_COUNT];
+	int plane_length[Y4M_MAX_NUM_PLANES];
+	uint8_t *planes[Y4M_MAX_NUM_PLANES];
 	int use_lseek;
 	int length;
 	int i;
@@ -46,7 +44,7 @@ COPYRIGHT "\n"
 "options:\n"
 "  -h     print this help text and exit\n"
 "  -l     display only the length of the stream in frames\n"
-"  -p     pipe the input to the output and write information to stderr\n",
+"  -p     pipe the input to stdout and write information to stderr\n",
 					stdout);
 				exit(0);
 			case 'l':
@@ -73,7 +71,7 @@ COPYRIGHT "\n"
 	/* Initialize internal data structures */
 	frame_length = y4m_si_get_framelength(&stream_info);
 	plane_count = y4m_si_get_plane_count(&stream_info);
-	if(plane_count > MAX_PLANE_COUNT) {
+	if(plane_count > Y4M_MAX_NUM_PLANES) {
 		fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
 		exit(1);
 	}

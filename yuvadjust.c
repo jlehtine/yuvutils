@@ -8,13 +8,17 @@
 #define COPYRIGHT "Copyright 2005 Johannes Lehtinen"
 
 #define DEFAULT_BUFFER_SIZE 30
-#define MAX_PLANE_COUNT 5
 
 #define VERBOSE_DEBUG 2
 
 #define OPER_WHITEBALANCE 1
 #define OPER_LCONTRAST 2
 #define OPER_CCONTRAST 4
+
+#define MIN_Y 16
+#define MAX_Y 235
+#define MIN_UV 16
+#define MAX_UV 240
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,24 +33,25 @@ int only_half = 0;
 int show_yprof = 0;
 y4m_stream_info_t stream_info;
 int plane_count;
-int plane_width[MAX_PLANE_COUNT];
-int plane_height[MAX_PLANE_COUNT];
-int plane_length[MAX_PLANE_COUNT];
-int x_shift[MAX_PLANE_COUNT];
-int y_shift[MAX_PLANE_COUNT];
-uint8_t *(*input_planes)[MAX_PLANE_COUNT];
+int plane_width[Y4M_MAX_NUM_PLANES];
+int plane_height[Y4M_MAX_NUM_PLANES];
+int plane_length[Y4M_MAX_NUM_PLANES];
+int x_shift[Y4M_MAX_NUM_PLANES];
+int y_shift[Y4M_MAX_NUM_PLANES];
+uint8_t *(*input_planes)[Y4M_MAX_NUM_PLANES];
 y4m_frame_info_t *input_frame_infos;
-int (*favg)[MAX_PLANE_COUNT];
-int avg_sum[MAX_PLANE_COUNT];
+int (*favg)[Y4M_MAX_NUM_PLANES];
+int avg_sum[Y4M_MAX_NUM_PLANES];
 unsigned long (*yvcount)[256];
 unsigned long yvcount_sum[256];
-uint8_t *output_planes[MAX_PLANE_COUNT];
+uint8_t *output_planes[Y4M_MAX_NUM_PLANES];
 int buffer_count = 0;
 int buffer_head = 0;
 int buffer_tail = 0;
 int buffer_size = DEFAULT_BUFFER_SIZE;
 int buffer_pos = 0;
 int verbose = 0;
+int clip = 0;
 int input_frame_count = 0;
 int output_frame_count = 0;
 
@@ -84,9 +89,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* Allocate space for buffers */
-	input_planes = malloc(sizeof(uint8_t *[MAX_PLANE_COUNT]) * buffer_size);
+	input_planes = malloc(sizeof(uint8_t *[Y4M_MAX_NUM_PLANES]) * buffer_size);
 	input_frame_infos = malloc(sizeof(y4m_frame_info_t) * buffer_size);
-	favg = malloc(sizeof(int [MAX_PLANE_COUNT]) * buffer_size);
+	favg = malloc(sizeof(int [Y4M_MAX_NUM_PLANES]) * buffer_size);
 	yvcount = malloc(sizeof(unsigned long [256]) * buffer_size);
 	if (input_planes == NULL || input_frame_infos == NULL
 		|| favg == NULL /*|| yvcount == NULL*/) {
@@ -100,7 +105,7 @@ int main(int argc, char *argv[]) {
 		y4m_init_frame_info(input_frame_infos + i);
 	}
 	plane_count = y4m_si_get_plane_count(&stream_info);
-	if (plane_count < 3 || plane_count > MAX_PLANE_COUNT) {
+	if (plane_count < 3 || plane_count > Y4M_MAX_NUM_PLANES) {
 		fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
 		exit(1);
 	}
@@ -192,7 +197,7 @@ static void parse_options(int argc, char *argv[]) {
 	int c;
 
 	/* Read options */	
-	while ((c = getopt(argc, argv, "b:CcdhHpvw")) != -1) {
+	while ((c = getopt(argc, argv, "b:CcdhHlpvw")) != -1) {
 		switch (c) {
 			case 'h':
 				fputs(
@@ -207,13 +212,14 @@ COPYRIGHT "\n"
 "commands:\n"
 "  -w       adjust white balance\n"
 "  -c       enhance luminance contrast\n"
-"  -C       adjust white balance and enhance chromatic contrast\n"
+"  -C       adjust white balance and enhance color contrast\n"
 "options:\n"
 "  -h       print this help text and exit\n"
 "  -b NUM   use information from up to NUM surrounding frames to adjust\n"
 "             the white balance of a frame (default is 30 frames)\n"
 "  -H       adjust only the first half of each frame (for comparison)\n"
 "  -p       show luminance profile as part of the output stream\n"
+"  -l       clip output YUV values to their nominal ranges\n"
 "  -v       verbose operation\n"
 "  -d       enable debug output\n",
 					stdout);
@@ -236,6 +242,9 @@ COPYRIGHT "\n"
 				break;
 			case 'H':
 				only_half = 1;
+				break;
+			case 'l':
+				clip = 1;
 				break;
 			case 'p':
 				show_yprof = 1;
@@ -282,6 +291,10 @@ COPYRIGHT "\n"
 			buffer_size);
 		if (only_half) {
 			fputs(PROGNAME ": conf: adjust only the first half of each frame\n",
+				stderr);
+		}
+		if (clip) {
+			fputs(PROGNAME ": conf: clip output YUV values to their nominal range\n",
 				stderr);
 		}
 	}
@@ -389,16 +402,21 @@ static void adjust_frame(int i) {
 			double avg;
 			double a, b;
 			uint8_t table[256];
+			double min;
+			double max;
 
 			if (j == 0) {
-				avg = (double) avg_sum[j] / buffer_count / 255;
+				min = MIN_Y;
+				max = MAX_Y;
 			} else {
-				avg = ((double) avg_sum[j] / buffer_count - 16) / 224;
+				min = MIN_UV;
+				max = MAX_UV;
 			}
-			if (avg < 0.01) {
-				avg = 0.01;
-			} else if (avg > 0.99) {
-				avg = 0.99;
+			avg = ((double) avg_sum[j] / buffer_count - min) / (max - min);
+			if (avg < 0.001) {
+				avg = 0.001;
+			} else if (avg > 0.999) {
+				avg = 0.999;
 			}
 			a = (0.5 - avg) / (avg * (avg - 1));
 			if (a < -1) {
@@ -411,23 +429,27 @@ static void adjust_frame(int i) {
 				double kn;
 				double v;
 
-				if (j == 0) {
-					kn = (double) k / 255;
+				kn = ((double) k - min) / (max - min);
+				v = (a * (kn * kn) + b * kn) * (max - min) + min;
+				if (clip) {
+					if (v < min) {
+						v = min;
+					} else if (v > max) {
+						v = max;
+					}
 				} else {
-					kn = ((double) k - 16) / 224;
-				}
-				v = a * (kn * kn) + b * kn;
-				if (j == 0) {
-					v *= 255;
-				} else {
-					v = 224 * v + 16;
+					if (v < 0) {
+						v = 0;
+					} else if (v > 255) {
+						v = 255;
+					}
 				}
 				table[k] = rint(v);
 			}
 			if (verbose & VERBOSE_DEBUG) {
 				char v = (j == 0 ? 'y' : (j == 1 ? 'u' : 'v'));
 				fprintf(stderr, PROGNAME ": debug: output frame %u average %c %u adjustment %c' = %.3f * %c^2 + %.3f * %c\n",
-					output_frame_count, v, (int) rint(avg), v, a, v, b, v);
+					output_frame_count, v, avg_sum[j] / buffer_count, v, a, v, b, v);
 			}
 			p = (input_planes[i])[j];
 			for (k = only_half ? plane_length[j] / 2 : plane_length[j]; k; k--) {
@@ -463,8 +485,15 @@ static void adjust_frame(int i) {
 		for (y = -100; y < 0; y++) {
 			p = (input_planes[i])[0] + (plane_height[0] + y) * plane_width[0]
 				+ (plane_width[0] - 256) / 2;
-			for (k = 256; k; k--) {
-				*p = *p >> 2;
+			for (k = 0; k < 256; k++) {
+				if (k < MIN_Y || k > MAX_Y) {
+					*p = *p >> 1;
+				} else {
+					*p = *p >> 2;
+				}
+				if (*p < MIN_Y) {
+					*p = MIN_Y;
+				}
 				p++;
 			}
 		}
@@ -478,7 +507,7 @@ static void adjust_frame(int i) {
 			int h = (yvcount[i])[k] * 100 / max;
 			for (y = plane_height[0] - h; y < plane_height[0]; y++) {
 				*((input_planes[i])[0] + y * plane_width[0]
-					+ (plane_width[0] - 256) / 2 + k) = 255;
+					+ (plane_width[0] - 256) / 2 + k) = MAX_Y;
 			}
 		}
 	}
