@@ -30,7 +30,6 @@
 
 int oper = 0;
 int only_half = 0;
-int show_yprof = 0;
 y4m_stream_info_t stream_info;
 int plane_count;
 int plane_width[Y4M_MAX_NUM_PLANES];
@@ -42,7 +41,6 @@ uint8_t *(*input_planes)[Y4M_MAX_NUM_PLANES];
 y4m_frame_info_t *input_frame_infos;
 int (*favg)[Y4M_MAX_NUM_PLANES];
 int avg_sum[Y4M_MAX_NUM_PLANES];
-unsigned long (*yvcount)[256];
 uint8_t *output_planes[Y4M_MAX_NUM_PLANES];
 int buffer_count = 0;
 int buffer_head = 0;
@@ -91,7 +89,6 @@ int main(int argc, char *argv[]) {
 	input_planes = malloc(sizeof(uint8_t *[Y4M_MAX_NUM_PLANES]) * buffer_size);
 	input_frame_infos = malloc(sizeof(y4m_frame_info_t) * buffer_size);
 	favg = malloc(sizeof(int [Y4M_MAX_NUM_PLANES]) * buffer_size);
-	yvcount = malloc(sizeof(unsigned long [256]) * buffer_size);
 	if (input_planes == NULL || input_frame_infos == NULL
 		|| favg == NULL /*|| yvcount == NULL*/) {
 		fputs(PROGNAME ": error: memory allocation failed\n", stderr);
@@ -193,7 +190,7 @@ static void parse_options(int argc, char *argv[]) {
 	int c;
 
 	/* Read options */	
-	while ((c = getopt(argc, argv, "b:CcdhHlpvw")) != -1) {
+	while ((c = getopt(argc, argv, "b:CcdhHlvw")) != -1) {
 		switch (c) {
 			case 'h':
 				fputs(
@@ -214,7 +211,6 @@ COPYRIGHT "\n"
 "  -b NUM   use information from up to NUM surrounding frames to adjust\n"
 "             the white balance of a frame (default is 30 frames)\n"
 "  -H       adjust only the first half of each frame (for comparison)\n"
-"  -p       show luminance profile as part of the output stream\n"
 "  -l       clip output YUV values to their nominal ranges\n"
 "  -v       verbose operation\n"
 "  -d       enable debug output\n",
@@ -241,9 +237,6 @@ COPYRIGHT "\n"
 				break;
 			case 'l':
 				clip = 1;
-				break;
-			case 'p':
-				show_yprof = 1;
 				break;
 			case 'v':
 				verbose |= 1;
@@ -345,16 +338,6 @@ static void analyze_buffered_frame(int i) {
 	int j, k;
 	uint8_t *p;
 
-	if (show_yprof) {
-		for (j = 0; j < 256; j++) {
-			(yvcount[i])[j] = 0;
-		}
-		p = (input_planes[i])[0];
-		for (k = plane_length[0]; k; k--) {
-			(yvcount[i])[*p]++;
-			p++;
-		}
-	}
 	for (j = 0; j <= 2; j++) {
 		unsigned long sum = 0;
 			
@@ -378,7 +361,6 @@ static void analyze_buffered_frame(int i) {
 
 static void adjust_frame(int i) {
 	int j, k;
-	int y;
 	uint8_t *p;
 
 	/* Contrast enhancements */
@@ -455,40 +437,6 @@ static void adjust_frame(int i) {
 			for (k = only_half ? plane_length[j] / 2 : plane_length[j]; k; k--) {
 				*p = uv_limit(*p + wboff);
 				p++;
-			}
-		}
-	}
-	
-	/* Include luminance profile in output if requested */
-	if (show_yprof) {
-		unsigned long max;
-		
-		for (y = -100; y < 0; y++) {
-			p = (input_planes[i])[0] + (plane_height[0] + y) * plane_width[0]
-				+ (plane_width[0] - 256) / 2;
-			for (k = 0; k < 256; k++) {
-				if (k < MIN_Y || k > MAX_Y) {
-					*p = *p >> 1;
-				} else {
-					*p = *p >> 2;
-				}
-				if (*p < MIN_Y) {
-					*p = MIN_Y;
-				}
-				p++;
-			}
-		}
-		max = 0;
-		for (k = 0; k < 256; k++) {
-			if ((yvcount[i])[k] > max) {
-				max = (yvcount[i])[k];
-			}
-		}
-		for (k = 0; k < 256; k++) {
-			int h = (yvcount[i])[k] * 100 / max;
-			for (y = plane_height[0] - h; y < plane_height[0]; y++) {
-				*((input_planes[i])[0] + y * plane_width[0]
-					+ (plane_width[0] - 256) / 2 + k) = MAX_Y;
 			}
 		}
 	}
