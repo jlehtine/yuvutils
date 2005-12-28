@@ -280,16 +280,7 @@ static void overlay_profile(void) {
 		stddev = sqrt(var);
 		
 		/* Calculate maximum frequency for scaling */
-		max = 0;
-		for (j = 0; j < 256; j++) {
-			if (vf[j] > max) {
-				max = vf[j];
-			}
-		}
-		a = ndf(avg, avg, stddev) * plane_length[i];
-		if (a > max) {
-			max = ceil(a);
-		}
+		max = 2 * ndf(avg, avg, stddev) * plane_length[i];
 		
 		/* Draw profile */
 		for (j = 0; j < 256; j++) {
@@ -297,6 +288,9 @@ static void overlay_profile(void) {
 			
 			x = (plane_width[0] - 256) / 2 + j;
 			h = 60 * vf[j] / max;
+			if (h > 60) {
+				h = 60;
+			}
 			y = plane_height[0] - 64 * (plane_count - i - 1) - h;
 			for (; h > 0; h--, y++) {
 				p = planes[0] + y * plane_width[0] + x;
