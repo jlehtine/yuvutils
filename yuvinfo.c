@@ -18,18 +18,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <yuv4mpeg.h>
 
-y4m_stream_info_t stream_info;
-int plane_count;
-int plane_length[Y4M_MAX_NUM_PLANES];
-int plane_width[Y4M_MAX_NUM_PLANES];
-int plane_height[Y4M_MAX_NUM_PLANES];
-uint8_t *planes[Y4M_MAX_NUM_PLANES];
+static y4m_stream_info_t stream_info;
+static int plane_count;
+static int plane_length[Y4M_MAX_NUM_PLANES];
+static int plane_width[Y4M_MAX_NUM_PLANES];
+static int plane_height[Y4M_MAX_NUM_PLANES];
+static uint8_t *planes[Y4M_MAX_NUM_PLANES];
+static double sqrt2pi;
 
 static void overlay_profile(void);
+static double ndf(double x, double avg, double stddev);
 
 int main(int argc, char *argv[]) {
 	int display = DISPLAY_ALL;
@@ -40,6 +43,9 @@ int main(int argc, char *argv[]) {
 	int use_lseek;
 	int length;
 	int i;
+	
+	/* Initialize calculated constants */
+	sqrt2pi = sqrt(2 * M_PI);
 	
 	/* Read options */
 	while ((i = getopt(argc, argv, "hlpP")) != -1) {
@@ -234,7 +240,7 @@ static void overlay_profile(void) {
 	for (i = 0; i < plane_count; i++) {
 		unsigned long vf[256];
 		unsigned long max;
-		double avg, var;
+		double avg, var, stddev;
 		double a;
 		int x, y;
 		int j;
@@ -250,6 +256,29 @@ static void overlay_profile(void) {
 			p++;
 		}
 		
+		/* Draw profile background */
+		y = plane_height[0] - 64 * (plane_count - i) + 4;
+		x = (plane_width[0] - 256) / 2;
+		p = planes[0] + y * plane_width[0] + x;
+		for (y = 60; y != 0; y--) {
+			for (j = 256; j != 0; j--) {
+				*p = (*p + 3 * MIN_Y) / 4;
+				p++;
+			}
+			p += plane_width[0] - 256;
+		}
+		
+		/* Calculate average, variance and standard deviation */
+		avg = 0;
+		for (j = 0; j < 256; j++) {
+			avg += ((double) vf[j] / plane_length[i]) * j;
+		}
+		var = 0;
+		for (j = 0; j < 256; j++) {
+			var += ((double) vf[j] / plane_length[i]) * pow(j - avg, 2);
+		}
+		stddev = sqrt(var);
+		
 		/* Calculate maximum frequency for scaling */
 		max = 0;
 		for (j = 0; j < 256; j++) {
@@ -257,17 +286,9 @@ static void overlay_profile(void) {
 				max = vf[j];
 			}
 		}
-		
-		/* Draw profile background */
-		y = plane_height[0] - 64 * (plane_count - i) + 4;
-		x = (plane_width[0] - 256) / 2;
-		p = planes[0] + y * plane_width[0] + x;
-		for (y = 60; y != 0; y--) {
-			for (j = 256; j != 0; j--) {
-				*p = (*p + 3 * MIN_Y) >> 2;
-				p++;
-			}
-			p += plane_width[0] - 256;
+		a = ndf(avg, avg, stddev) * plane_length[i];
+		if (a > max) {
+			max = ceil(a);
 		}
 		
 		/* Draw profile */
@@ -282,5 +303,22 @@ static void overlay_profile(void) {
 				*p = MAX_Y;
 			}
 		}
+		
+		/* Draw normal distribution */
+		x = (plane_width[0] - 256) / 2;
+		y = plane_height[0] - 64 * (plane_count - i - 1);
+		for (j = 0; j < 256; j++, x++) {
+			int h;
+			
+			h = rint(60 * plane_length[i] * ndf(j, avg, stddev) / max);
+			if (h > 0 && h <= 60) {
+				p = planes[0] + (y - h) * plane_width[0] + x;
+				*p = (MIN_Y + MAX_Y) / 2;
+			}
+		}
 	}
+}
+
+static double ndf(double x, double avg, double stddev) {
+	return (1/(stddev * sqrt2pi)) * exp(-0.5 * pow((x - avg) / stddev, 2));
 }
