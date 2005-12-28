@@ -43,7 +43,6 @@ y4m_frame_info_t *input_frame_infos;
 int (*favg)[Y4M_MAX_NUM_PLANES];
 int avg_sum[Y4M_MAX_NUM_PLANES];
 unsigned long (*yvcount)[256];
-unsigned long yvcount_sum[256];
 uint8_t *output_planes[Y4M_MAX_NUM_PLANES];
 int buffer_count = 0;
 int buffer_head = 0;
@@ -97,9 +96,6 @@ int main(int argc, char *argv[]) {
 		|| favg == NULL /*|| yvcount == NULL*/) {
 		fputs(PROGNAME ": error: memory allocation failed\n", stderr);
 		exit(1);
-	}
-	for (i = 0; i < 256; i++) {
-		yvcount_sum[i] = 0;
 	}
 	for (i = 0; i < buffer_size; i++) {
 		y4m_init_frame_info(input_frame_infos + i);
@@ -320,11 +316,6 @@ static int read_frame(void) {
 		for (i = 0; i < plane_count; i++) {
 			avg_sum[i] += (favg[buffer_head])[i];
 		}
-		if (show_yprof) {
-			for (i = 0; i < 256; i++) {
-				yvcount_sum[i] += (yvcount[buffer_head])[i];
-			}
-		}
 		if (++buffer_head >= buffer_size) {
 			buffer_head = 0;
 		}
@@ -341,11 +332,6 @@ static int read_frame(void) {
 static void step_buffer(void) {
 	int i;
 
-	if (show_yprof) {
-		for (i = 0; i < 256; i++) {
-			yvcount_sum[i] -= (yvcount[buffer_tail])[i];
-		}
-	}
 	for (i = 0; i < plane_count; i++) {
 		avg_sum[i] -= (favg[buffer_tail])[i];
 	}
