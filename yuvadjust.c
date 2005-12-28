@@ -405,11 +405,6 @@ static void adjust_frame(int i) {
 				avg = 0.999;
 			}
 			a = (0.5 - avg) / (avg * (avg - 1));
-			if (a < -1) {
-				a = -1;
-			} else if (a > 1) {
-				a = 1;
-			}
 			b = 1 - a;		
 			for (k = 0; k < 256; k++) {
 				double kn;
