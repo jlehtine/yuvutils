@@ -1,6 +1,20 @@
 /*------------------------------------------------------------------------
- * yuvinfo, describe YUV4MPEG streams
- * Copyright 2005 Johannes Lehtinen
+ * yuvinfo, describes a YUV4MPEG stream
+ * Copyright 2005 Johannes Lehtinen <johannes.lehtinen@iki.fi>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
  *----------------------------------------------------------------------*/
 
 #define PROGNAME "yuvinfo"
@@ -31,13 +45,13 @@ static int plane_height[Y4M_MAX_NUM_PLANES];
 static uint8_t *planes[Y4M_MAX_NUM_PLANES];
 static double sqrt2pi;
 
-static void overlay_profile(void);
+static void overlay_histograms(void);
 static double ndf(double x, double avg, double stddev);
 
 int main(int argc, char *argv[]) {
 	int display = DISPLAY_ALL;
 	int piping = 0;
-	int show_profile = 0;
+	int show_histograms = 0;
 	y4m_frame_info_t frame_info;
 	int frame_length;
 	int use_lseek;
@@ -48,31 +62,33 @@ int main(int argc, char *argv[]) {
 	sqrt2pi = sqrt(2 * M_PI);
 	
 	/* Read options */
-	while ((i = getopt(argc, argv, "hlpP")) != -1) {
+	while ((i = getopt(argc, argv, "hlcH")) != -1) {
 		switch (i) {
 			case 'h':
 				fputs(
-PROGNAME " " VERSION " - a resampler for YUV4MPEG streams\n"
+PROGNAME " " VERSION " - describes a YUV4MPEG stream\n"
 COPYRIGHT "\n"
 "\n"
-"Describes a YUV4MPEG stream read from the standard input.\n"
+"Describes a YUV4MPEG stream read from the standard input using an output\n"
+"format similar to lavinfo. Optionally copies the input to the standard output\n"
+"and can also overlay YUV histograms in the output video stream.\n"
 "\n"
-"usage: " PROGNAME " [<option>...]\n"
+"usage: " PROGNAME " [-h] [-l] [-c] [-H]\n"
 "options:\n"
 "  -h     print this help text and exit\n"
 "  -l     display only the length of the stream in frames\n"
-"  -p     pipe the input to stdout and write information to stderr\n"
-"  -P     overlay luminance and color profile (implies -p)\n",
+"  -c     copy the input to stdout and write information to stderr\n"
+"  -H     overlay YUV histograms in the output video stream (implies -c)\n",
 					stdout);
 				exit(0);
 			case 'l':
 				display = DISPLAY_LENGTH;
 				break;
-			case 'p':
+			case 'c':
 				piping = 1;
 				break;
-			case 'P':
-				show_profile = 1;
+			case 'H':
+				show_histograms = 1;
 				piping = 1;
 				break;
 			default:
@@ -101,7 +117,7 @@ COPYRIGHT "\n"
 		plane_length[i] = y4m_si_get_plane_length(&stream_info, i);
 		plane_width[i] = y4m_si_get_plane_width(&stream_info, i);
 		plane_height[i] = y4m_si_get_plane_height(&stream_info, i);
-		if (show_profile
+		if (show_histograms
 			&& (plane_width[i] * plane_height[i] != plane_length[i]
 				|| (i == 0
 					&& (plane_width[i] != y4m_si_get_width(&stream_info)
@@ -112,7 +128,7 @@ COPYRIGHT "\n"
 			exit(1);
 		}
 	}
-	if (show_profile
+	if (show_histograms
 		&& (plane_width[0] < 256 || plane_height[0] < plane_count * 64)) {
 		fputs(PROGNAME ": error: frame too small for profiling overlay",
 			stderr);
@@ -151,8 +167,8 @@ COPYRIGHT "\n"
 				fputs(PROGNAME ": error: error reading frame data\n", stderr);
 				exit(1);
 			}
-			if (show_profile) {
-				overlay_profile();
+			if (show_histograms) {
+				overlay_histograms();
 			}
 			if (piping && y4m_write_frame(STDOUT_FILENO, &stream_info, &frame_info, planes) != Y4M_OK) {
 				fputs(PROGNAME ": error error writing frame\n", stderr);
@@ -233,15 +249,14 @@ COPYRIGHT "\n"
 	return 0;
 }
 
-static void overlay_profile(void) {
+static void overlay_histograms(void) {
 	int i;
 	
-	/* Calculate and overlay value profiles for each plane */
+	/* Calculate and overlay histograms for each plane */
 	for (i = 0; i < plane_count; i++) {
 		unsigned long vf[256];
 		unsigned long max;
 		double avg, var, stddev;
-		double a;
 		int x, y;
 		int j;
 		uint8_t *p;
@@ -256,7 +271,7 @@ static void overlay_profile(void) {
 			p++;
 		}
 		
-		/* Draw profile background */
+		/* Draw histogram background */
 		y = plane_height[0] - 64 * (plane_count - i) + 4;
 		x = (plane_width[0] - 256) / 2;
 		p = planes[0] + y * plane_width[0] + x;
@@ -282,7 +297,7 @@ static void overlay_profile(void) {
 		/* Calculate maximum frequency for scaling */
 		max = 2 * ndf(avg, avg, stddev) * plane_length[i];
 		
-		/* Draw profile */
+		/* Draw histogram */
 		for (j = 0; j < 256; j++) {
 			int h;
 			

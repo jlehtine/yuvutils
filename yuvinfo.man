@@ -1,0 +1,63 @@
+.TH "yuvinfo" 1 "29 December 2005" "Johannes Lehtinen" "JL yuvutils"
+.SH NAME
+yuvinfo \- describe a YUV4MPEG stream
+.SH SYNOPSIS
+.B yuvinfo
+.RB [ -h ]
+.RB [ -l ]
+.RB [ -c ]
+.RB [ -H ]
+.SH DESCRIPTION
+Describes a YUV4MPEG stream read from the standard input using an output
+format similar to \fBlavinfo\fP.
+Optionally copies the input to the standard output
+and can also overlay YUV histograms in the output video stream.
+.SH EXAMPLES
+.B These two commands should produce similar output:
+.br
+lavinfo input.avi
+.br
+lav2yuv input.avi | yuvinfo
+
+.B Store information about raw video stream before encoding:
+.br
+lav2yuv input.avi \\
+.br
+| yuvresample \-f 25:1 \\
+.br
+| yuvinfo \-c 2> info.txt \\
+.br
+| mpeg2enc \-f 8 \-o output.mpeg2
+
+.B Visually inspect the YUV histograms:
+.br
+lav2yuv video.avi | yuvinfo \-H | yuvplay
+.SH OPTIONS
+.TP
+.B \-h
+Print brief usage information and exit immediately.
+
+.TP
+.B \-l
+Output only the length of the stream as number of frames.
+This can be used in scripts to easily obtain the length of a stream.
+
+.TP
+.B \-c
+Copy the input to the standard output and write information to the
+standard error.
+This option makes it easy to record information about video stream as it is
+been processed or encoded.
+
+.TP
+.B \-H
+Overlay YUV histograms in the output video stream. Implies -c.
+.SH SEE ALSO
+.BR mjpegtools (1)
+.SH AUTHOR
+.B yuvinfo
+was implemented by Johannes Lehtinen.
+However, it is only a thin wrapper around the \fBmjpegutils\fP
+library provided by the
+.BR mjpegtools (1)
+package.

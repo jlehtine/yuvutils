@@ -1,6 +1,20 @@
 /*------------------------------------------------------------------------
  * yuvadjust, adjust white balance and contrast of YUV4MPEG streams
- * Copyright 2005 Johannes Lehtinen
+ * Copyright 2005 Johannes Lehtinen <johannes.lehtinen@iki.fi>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
  *----------------------------------------------------------------------*/
 
 #define PROGNAME "yuvadjust"
@@ -11,8 +25,8 @@
 
 #define VERBOSE_DEBUG 2
 
-#define OPER_WHITEBALANCE 1
-#define OPER_LCONTRAST 2
+#define OPER_LCONTRAST 1
+#define OPER_WHITEBALANCE 2
 #define OPER_CCONTRAST 4
 
 #define MIN_Y 16
@@ -28,36 +42,32 @@
 #include <assert.h>
 #include <yuv4mpeg.h>
 
-int oper = 0;
-int only_half = 0;
-y4m_stream_info_t stream_info;
-int plane_count;
-int plane_width[Y4M_MAX_NUM_PLANES];
-int plane_height[Y4M_MAX_NUM_PLANES];
-int plane_length[Y4M_MAX_NUM_PLANES];
-int x_shift[Y4M_MAX_NUM_PLANES];
-int y_shift[Y4M_MAX_NUM_PLANES];
-uint8_t *(*input_planes)[Y4M_MAX_NUM_PLANES];
-y4m_frame_info_t *input_frame_infos;
-int (*favg)[Y4M_MAX_NUM_PLANES];
-int avg_sum[Y4M_MAX_NUM_PLANES];
-uint8_t *output_planes[Y4M_MAX_NUM_PLANES];
-int buffer_count = 0;
-int buffer_head = 0;
-int buffer_tail = 0;
-int buffer_size = DEFAULT_BUFFER_SIZE;
-int buffer_pos = 0;
-int verbose = 0;
-int clip = 0;
-int input_frame_count = 0;
-int output_frame_count = 0;
+static int oper = 0;
+static int only_half = 0;
+static y4m_stream_info_t stream_info;
+static int plane_count;
+static int plane_width[Y4M_MAX_NUM_PLANES];
+static int plane_height[Y4M_MAX_NUM_PLANES];
+static int plane_length[Y4M_MAX_NUM_PLANES];
+static uint8_t *(*planes)[Y4M_MAX_NUM_PLANES];
+static y4m_frame_info_t *input_frame_infos;
+static int (*favg)[Y4M_MAX_NUM_PLANES];
+static int avg_sum[Y4M_MAX_NUM_PLANES];
+static int buffer_count = 0;
+static int buffer_head = 0;
+static int buffer_tail = 0;
+static int buffer_size = DEFAULT_BUFFER_SIZE;
+static int buffer_pos = 0;
+static int verbose = 0;
+static int clip = 0;
+static int input_frame_count = 0;
+static int output_frame_count = 0;
 
 static void parse_options(int argc, char *argv[]);
 static int read_frame(void);
 static void step_buffer(void);
 static void analyze_buffered_frame(int i);
 static void adjust_frame(int i);
-static inline int uv_limit(int v);
 
 int main(int argc, char *argv[]) {
 	int i;
@@ -86,10 +96,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* Allocate space for buffers */
-	input_planes = malloc(sizeof(uint8_t *[Y4M_MAX_NUM_PLANES]) * buffer_size);
+	planes = malloc(sizeof(uint8_t *[Y4M_MAX_NUM_PLANES]) * buffer_size);
 	input_frame_infos = malloc(sizeof(y4m_frame_info_t) * buffer_size);
 	favg = malloc(sizeof(int [Y4M_MAX_NUM_PLANES]) * buffer_size);
-	if (input_planes == NULL || input_frame_infos == NULL
+	if (planes == NULL || input_frame_infos == NULL
 		|| favg == NULL /*|| yvcount == NULL*/) {
 		fputs(PROGNAME ": error: memory allocation failed\n", stderr);
 		exit(1);
@@ -112,33 +122,9 @@ int main(int argc, char *argv[]) {
 			fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
 			exit(1);
 		}
-		if (i >= 1 && i <= 2) {
-			switch (plane_width[0] / plane_width[i]) {
-				case 1:
-					x_shift[i] = 0;
-					break;
-				case 2:
-					x_shift[i] = 1;
-					break;
-				default:
-					fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
-					exit(1);
-			}
-			switch (plane_height[0] / plane_height[i]) {
-				case 1:
-					y_shift[i] = 0;
-					break;
-				case 2:
-					y_shift[i] = 1;
-					break;
-				default:
-					fputs(PROGNAME ": error: unsupported chroma mode\n", stderr);
-					exit(1);
-			}
-		}
 		for (j = 0; j < buffer_size; j++) {
-			(input_planes[j])[i] = malloc(plane_length[i]);
-			if ((input_planes[j])[i] == NULL) {
+			(planes[j])[i] = malloc(plane_length[i]);
+			if ((planes[j])[i] == NULL) {
 				fputs(PROGNAME ": error: memory allocation failed\n", stderr);
 				exit(1);
 			}
@@ -165,7 +151,7 @@ int main(int argc, char *argv[]) {
 		adjust_frame(buffer_pos);
 		if (y4m_write_frame(STDOUT_FILENO, &stream_info,
 			input_frame_infos + buffer_pos,
-			input_planes[buffer_pos]) != Y4M_OK) {
+			planes[buffer_pos]) != Y4M_OK) {
 			fputs(PROGNAME ": error: could not write output stream\n",
 				stderr);
 			exit(1);
@@ -190,28 +176,36 @@ static void parse_options(int argc, char *argv[]) {
 	int c;
 
 	/* Read options */	
-	while ((c = getopt(argc, argv, "b:CcdhHlvw")) != -1) {
+	while ((c = getopt(argc, argv, "b:cdhHlvwW")) != -1) {
 		switch (c) {
 			case 'h':
 				fputs(
-PROGNAME " " VERSION " - adjust white balance and contrast of YUV4MPEG streams\n"
+PROGNAME " " VERSION " - adjust luminance and white balance of a YUV4MPEG stream\n"
 COPYRIGHT "\n"
 "\n"
-"Adjust the while balance and/or contrast of a YUV4MPEG stream. The source\n"
-"stream is read from the standard input and the result is written to the\n"
-"standard output.\n"
+"Automatically adjust luminance level, contrast and white balance of\n"
+"a YUV4MPEG stream. The input stream is read from the standard input and the\n"
+"adjusted stream is written to the standard output. The stream is adjusted\n"
+"according to the gray world assumption.\n"
 "\n"
-"usage: " PROGNAME " <command>... [<option>...]\n"
+"This tool can be used to quickly enhance video which is too dark or which is\n"
+"blueish or reddish. A typical example would be a video recorded in a dimly\n"
+"lighted room. However, because the gray world assumption is not valid\n"
+"for all content, the result might also be worse, especially when applied to\n"
+"high quality input. It is a good idea to experiment and to compare the result\n"
+"to the original (see also the -H option).\n"
+"\n"
+"usage: " PROGNAME " command... [option...]\n"
 "commands:\n"
-"  -w       adjust white balance\n"
-"  -c       enhance luminance contrast\n"
-"  -C       adjust white balance and enhance color contrast\n"
+"  -l       adjust luminance level and contrast\n"
+"  -w       adjust white balance (conflicts with -W)\n"
+"  -W       adjust white balance and color contrast (conflicts with -w)\n"
 "options:\n"
 "  -h       print this help text and exit\n"
 "  -b NUM   use information from up to NUM surrounding frames to adjust\n"
-"             the white balance of a frame (default is 30 frames)\n"
+"             a frame (default is 30 frames)\n"
 "  -H       adjust only the first half of each frame (for comparison)\n"
-"  -l       clip output YUV values to their nominal ranges\n"
+"  -c       clip output YUV values to their nominal ranges (exclude headroom)\n"
 "  -v       verbose operation\n"
 "  -d       enable debug output\n",
 					stdout);
@@ -223,11 +217,8 @@ COPYRIGHT "\n"
 					exit(1);
 				}
 				break;
-			case 'C':
-				oper |= OPER_CCONTRAST;
-				break;
 			case 'c':
-				oper |= OPER_LCONTRAST;
+				clip = 1;
 				break;
 			case 'd':
 				verbose |= VERBOSE_DEBUG;
@@ -236,13 +227,16 @@ COPYRIGHT "\n"
 				only_half = 1;
 				break;
 			case 'l':
-				clip = 1;
+				oper |= OPER_LCONTRAST;
 				break;
 			case 'v':
 				verbose |= 1;
 				break;
 			case 'w':
 				oper |= OPER_WHITEBALANCE;
+				break;
+			case 'W':
+				oper |= OPER_CCONTRAST;
 				break;
 			case ':':
 				fputs(PROGNAME ": error: missing option parameter\n", stderr);
@@ -271,10 +265,10 @@ COPYRIGHT "\n"
 			fputs(PROGNAME ": conf: adjust white balance\n", stderr);
 		}
 		if (oper & OPER_LCONTRAST) {
-			fputs(PROGNAME ": conf: enhance luminance contrast\n", stderr);
+			fputs(PROGNAME ": conf: adjust luminance level and contrast\n", stderr);
 		}
 		if (oper & OPER_CCONTRAST) {
-			fputs(PROGNAME ": conf: enhance color contrast\n", stderr);
+			fputs(PROGNAME ": conf: adjust white balance and color contrast\n", stderr);
 		}
 		fprintf(stderr, PROGNAME ": conf: buffer size %u frames\n",
 			buffer_size);
@@ -296,7 +290,7 @@ static int read_frame(void) {
 		step_buffer();
 	}
 	if ((i = y4m_read_frame(STDIN_FILENO, &stream_info,
-		input_frame_infos + buffer_head, input_planes[buffer_head]))
+		input_frame_infos + buffer_head, planes[buffer_head]))
 		== Y4M_OK) {
 		
 		buffer_count++;
@@ -343,7 +337,7 @@ static void analyze_buffered_frame(int i) {
 			
 		if ((j == 0 && (oper & OPER_LCONTRAST))
 			|| (j > 0 && (oper & (OPER_WHITEBALANCE | OPER_CCONTRAST)))) {
-			p = (input_planes[i])[j];
+			p = (planes[i])[j];
 			for (k = plane_length[j]; k; k--) {
 				sum += *p;
 				p++;
@@ -414,7 +408,7 @@ static void adjust_frame(int i) {
 				fprintf(stderr, PROGNAME ": debug: output frame %u average %c %u adjustment %c' = %.3f * %c^2 + %.3f * %c\n",
 					output_frame_count, v, avg_sum[j] / buffer_count, v, a, v, b, v);
 			}
-			p = (input_planes[i])[j];
+			p = (planes[i])[j];
 			for (k = only_half ? plane_length[j] / 2 : plane_length[j]; k; k--) {
 				*p = table[*p];
 				p++;
@@ -422,32 +416,45 @@ static void adjust_frame(int i) {
 		}
 	}
 	
-	/* White balance adjustment */
+	/* Plain white balance adjustment */
 	if (oper & OPER_WHITEBALANCE) {
 		for (j = 1; j <= 2; j++) {
-			int wboff = -((avg_sum[j] + buffer_count / 2) / buffer_count - 128);
+			int min, max;
+			int wboff;
 			
+			if (j == 0) {
+				min = MIN_Y;
+				max = MAX_Y;
+			} else {
+				min = MIN_UV;
+				max = MAX_UV;
+			}
+			wboff = -((avg_sum[j] + buffer_count / 2) / buffer_count - 128);
 			if (verbose & VERBOSE_DEBUG) {
 				if (oper & OPER_WHITEBALANCE) {
 					fprintf(stderr, PROGNAME ": debug: output frame %u white balance adjustment %c' = %c %c %u\n",
 						output_frame_count, j == 1 ? 'u' : 'v', j == 1 ? 'u' : 'v', wboff < 0 ? '-' : '+', abs(wboff));
 				}
 			}
-			p = (input_planes[i])[j];
+			p = (planes[i])[j];
 			for (k = only_half ? plane_length[j] / 2 : plane_length[j]; k; k--) {
-				*p = uv_limit(*p + wboff);
+				int v = *p + wboff;
+				if (clip) {
+					if (v < min) {
+						v = min;
+					} else if (v > max) {
+						v = max;
+					}
+				} else {
+					if (v < 0) {
+						v = 0;
+					} else if (v > 255) {
+						v = 255;
+					}
+				}
+				*p = v;
 				p++;
 			}
 		}
-	}
-}
-
-static inline int uv_limit(int v) {
-	if (v <= 16) {
-		return 16;
-	} else if (v >= 240) {
-		return 240;
-	} else {
-		return v;
 	}
 }

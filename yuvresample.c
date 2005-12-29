@@ -1,6 +1,20 @@
 /*------------------------------------------------------------------------
  * yuvresample, a resampler for YUV4MPEG streams
- * Copyright 2005 Johannes Lehtinen
+ * Copyright 2005 Johannes Lehtinen <johannes.lehtinen@iki.fi>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
  *----------------------------------------------------------------------*/
 
 #define PROGNAME "yuvresample"
@@ -19,32 +33,32 @@
 #include <assert.h>
 #include <yuv4mpeg.h>
 
-y4m_ratio_t input_fps = { 0, 0 };
-y4m_ratio_t output_fps = { 0, 0 };
-int input_interlacing = Y4M_UNKNOWN;
-int output_interlacing = Y4M_UNKNOWN;
-int sampling_mode = SAMPLING_AVERAGE;
-int verbose = 0;
+static y4m_ratio_t input_fps = { 0, 0 };
+static y4m_ratio_t output_fps = { 0, 0 };
+static int input_interlacing = Y4M_UNKNOWN;
+static int output_interlacing = Y4M_UNKNOWN;
+static int sampling_mode = SAMPLING_AVERAGE;
+static int verbose = 0;
 
-y4m_stream_info_t input_si;
-y4m_stream_info_t output_si;
-y4m_frame_info_t fi;
-int plane_count;
-int plane_width[Y4M_MAX_NUM_PLANES];
-int plane_height[Y4M_MAX_NUM_PLANES];
-int plane_length[Y4M_MAX_NUM_PLANES];
-uint8_t *input_planes[2][Y4M_MAX_NUM_PLANES];
-uint8_t *output_planes[Y4M_MAX_NUM_PLANES];
-uint8_t *work_lines[2];
-int input_frame_time;
-int output_frame_time;
-double frame_time_d;
-int input_pos = 0;
-int output_pos = 0;
-int buffer_frame_count = 0;
-int buffer_frame_index[2] = { -1, -1 };
-int input_frame_count = 0;
-int output_frame_count = 0;
+static y4m_stream_info_t input_si;
+static y4m_stream_info_t output_si;
+static y4m_frame_info_t fi;
+static int plane_count;
+static int plane_width[Y4M_MAX_NUM_PLANES];
+static int plane_height[Y4M_MAX_NUM_PLANES];
+static int plane_length[Y4M_MAX_NUM_PLANES];
+static uint8_t *input_planes[2][Y4M_MAX_NUM_PLANES];
+static uint8_t *output_planes[Y4M_MAX_NUM_PLANES];
+static uint8_t *work_lines[2];
+static int input_frame_time;
+static int output_frame_time;
+static double frame_time_d;
+static int input_pos = 0;
+static int output_pos = 0;
+static int buffer_frame_count = 0;
+static int buffer_frame_index[2] = { -1, -1 };
+static int input_frame_count = 0;
+static int output_frame_count = 0;
 
 static void parse_options(int argc, char *argv[]);
 static void parse_ratio(y4m_ratio_t *ratio, const char *str);
@@ -294,9 +308,13 @@ static void parse_options(int argc, char *argv[]) {
 PROGNAME " " VERSION " - a resampler for YUV4MPEG streams\n"
 COPYRIGHT "\n"
 "\n"
-"Resamples a YUV4MPEG stream, possibly changing the interlacing mode as well.\n"
-"The source stream is read from the standard input and the result is written\n"
-"to the standard output.\n"
+"Resamples a YUV4MPEG stream to change the frame rate, optionally changing the\n"
+"interlacing mode as well. The source stream is read from the standard input\n"
+"and the result is written to the standard output.\n"
+"\n"
+"Each output frame/field is produced as the weighted average of the two\n"
+"temporally closest input frames/fields. Optionally, the closest frame/field\n"
+"can be used as the single source.\n"
 "\n"
 "usage: " PROGNAME " [<option>...]\n"
 "options:\n"

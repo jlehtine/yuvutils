@@ -1,0 +1,119 @@
+.TH "yuvadjust" 1 "29 December 2005" "Johannes Lehtinen" "JL yuvutils"
+.SH NAME
+yuvadjust \- adjust luminance and white balance of a YUV4MPEG stream
+.SH SYNOPSIS
+.B yuvadjust
+.RB [ -l ]
+.RB [ -w | -W ]
+.RB [ -h ]
+.RB [ -b
+.IR frames ]
+.RB [ -H ]
+.RB [ -c ]
+.RB [ -v ]
+.RB [ -d ]
+.SH DESCRIPTION
+Automatically adjust luminance level, contrast and white balance of
+a YUV4MPEG stream.
+The input stream is read from the standard input and the
+adjusted stream is written to the standard output.
+The stream is adjusted according to the gray world assumption.
+
+This tool can be used to quickly enhance video which is too dark or which is
+blueish or reddish.
+A typical example would be a video recorded in a dimly
+lighted room.
+However, because the gray world assumption is not valid
+for all content, the result might also be worse, especially when applied to
+high quality input.
+It is a good idea to experiment and to compare the result
+to the original (see also the -H option).
+.SH EXAMPLES
+.B Enhance poor quality video:
+.br
+lav2yuv input.avi | yuvadjust -l -W | yuv2lav -o output.avi
+
+.B Adjust luminance level and contrast of too dark video:
+.br
+lav2yuv input.avi | yuvadjust -l | yuv2lav -o output.avi
+
+.B Adjust white balance of a blueish or reddish video:
+.br
+lav2yuv input.avi | yuvadjust -w | yuv2lav -o output.avi
+.SH OPTIONS
+.TP
+.B \-l
+Adjust luminance level and contrast.
+The luminance values of a frame are adjusted by calculating the average
+luminance of the surrounding frames and then applying a quadratic transformation
+which preserves nominal black and white values while mapping the current
+average luminance value to 50% gray.
+Notice that the resulting average luminance is not necessarily 50% gray.
+
+.TP
+.B \-w
+Adjust white balance.
+The Cb/Cr values of a frame are adjusted independently by calculating the
+average Cb/Cr values of the surrounding frames and then shifting the Cb/Cr
+values by constant amount so that the resulting stream is gray on average.
+Conflicts with -W.
+
+.TP
+.B \-W
+Adjust white balance and color contrast.
+The Cb/Cr values of a frame are adjusted independently by calculating the
+average Cb/Cr values of the surrounding frames and then applying a quadratic
+transformation which preserves nominal minimum and maximum values while mapping
+the current average color to gray.
+Notice that the resulting average color is not necessarily gray.
+Conflicts with -w.
+
+.TP
+.B \-h
+Print brief usage information and exit immediately.
+
+.TP
+.B \-b \fIframes\fP
+Use information from up to \fIframes\fP buffered surrounding frames to
+adjust a frame.
+Default is 30 frames.
+
+.TP
+.B \-H
+Adjust only the top half of each frame.
+This makes it easy to compare the resulting video to the original.
+More detailed analysis can be done using \fByuvinfo\fP(1) with the -H option
+to display YUV histograms of the original and resulting streams.
+
+.TP
+.B \-c
+Clip output YUV values to their nominal range (16 to 235 for Y, 16 to 240 for
+U and V).
+This does not affect the way adjustments are done, clipping is performed as a
+post-processing step.
+Default is to use the full 8-bit range.
+
+.TP
+.B \-v
+Be more verbose (writes extra information to standard error).
+
+.TP
+.B \-d
+Enables debug output (writes debug information to standard error).
+Use this option to see the exact adjustments done for each frame.
+Implies -v.
+.SH SEE ALSO
+.BR mjpegtools (1)
+.SH BUGS
+.B yuvadjust
+depends fully on the gray world assumption and there is no logic which
+would prevent it from overshooting corrections. This is sometimes desirable
+when processing really poor quality video material but it causes surprises when
+applying this tool to higher quality material.
+.SH AUTHOR
+.B yuvadjust
+was implemented by Johannes Lehtinen.
+For input and output it uses the \fBmjpegutils\fP
+library provided by the
+.BR mjpegtools (1) 
+package.

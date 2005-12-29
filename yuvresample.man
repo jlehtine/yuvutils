@@ -1,0 +1,125 @@
+.TH "yuvresample" 1 "29 December 2005" "Johannes Lehtinen" "JL yuvutils"
+.SH NAME
+yuvresample \- a resampler for YUV4MPEG streams
+.SH SYNOPSIS
+.B yuvresample
+.RB [ -f
+.IR rate ]
+.RB [ -F
+.IR rate ]
+.RB [ -i
+.IR interlacing ]
+.RB [ -I
+.IR interlacing ]
+.RB [ -m
+.IR mode ]
+.RB [ -v ]
+.RB [ -d ]
+.SH DESCRIPTION
+Resamples a YUV4MPEG stream to change the frame rate, optionally changing the
+interlacing mode as well.
+The source stream is read from the standard input and the result is written
+to the standard output.
+
+Each output frame/field is produced as the weighted average of the two
+temporally closest input frames/fields.
+Optionally, the closest input frame/field can be used as the single source.
+Blending of the two closest frames/fields does not cause as visible stepping
+as simply dropping or duplicating frames does but it blurs moving objects.
+Try both approaches to see which you prefer.
+.SH EXAMPLES
+.B Convert video to PAL frame rate:
+.br
+lav2yuv input.avi | yuvresample -f 25:1 | yuv2lav -o output.avi
+
+.B Convert interlaced video to progressive video and PAL frame rate:
+.br
+lav2yuv input.avi | yuvresample -f 25:1 -i p | yuv2lav -o output.avi
+
+.B Create slow motion 1/5 speed video (assuming PAL frame rate for input):
+.br
+lav2yuv input.avi | yuvresample -F 5:1 -f 25:1 | yuv2lav -o output.avi
+
+.B Speed up video 2 times (assuming PAL frame rate for input):
+.br
+lav2yuv input.avi | yuvresample -F 50:1 -f 25:1 | yuv2lav -o output.avi
+
+.B Convert progressive scan video to interlaced video:
+.br
+lav2yuv input.avi | yuvresample -i b | yuv2lav -o output.avi
+.SH OPTIONS
+.TP
+.B \-h
+Print brief usage information and exit immediately.
+
+.TP
+.B \-f \fIrate\fP
+Specify the output frame rate as a ratio.
+For example, 25:1 for PAL or
+30000:1001 for NTCS.
+Defaults to the input frame rate.
+
+.TP
+.B \-F \fIrate\fP
+Override the input frame rate by the specified frame rate ratio.
+This can be used if you wish to speed up or slow down the original video
+or if the frame rate information for the input is incorrect.
+If you wish to just change the frame rate information of the stream
+then see
+.BR yuvfps (1)
+option -c.
+
+.TP
+.B \-i \fIinterlacing\fP
+Specify the output interlacing mode.
+Defaults to the input interlacing mode.
+The possible values are:
+.IP
+.B p
+\- progressive scan (non-interlaced)
+.br
+.B t
+\- top-field first
+.br
+.B b
+\- bottom-field first
+
+.TP
+.B \-I \fIinterlacing\fP
+Override the input interlacing mode by the specified mode.
+This can be used if the interlacing information for the input is incorrect.
+The possible values are same as for -i.
+
+.TP
+.B \-m \fImode\fP
+Specify the resampling mode to be used when producing an output frame/field.
+The possible values are:
+.IP
+.B c
+\- use only the closest input frame/field
+.br
+.B a
+\- use the weighted average of two input frames/fields
+
+.TP
+.B \-v
+Be more verbose.
+
+.TP
+.B \-d
+Enables debug output.
+Implies -v.
+.SH SEE ALSO
+.BR mjpegtools (1),
+.BR yuvfps (1)
+.SH BUGS
+.B yuvresample
+does not try to account for motion. Motion compensation would reduce blurring
+of moving objects caused by simply blending the two closest frames/fields.
+.SH AUTHOR
+.B yuvresample
+was implemented by Johannes Lehtinen.
+For input and output it uses the \fBmjpegutils\fP
+library provided by the
+.BR mjpegtools (1) 
+package.
