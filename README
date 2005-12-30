@@ -1,0 +1,127 @@
+ABOUT
+-----
+
+This is JL yuvutils version 1.0.  It includes three small utility
+programs for processing YUV4MPEG video streams as produced and consumed
+by the tools included in the MJPEG tools package[1].
+
+I implemented these utilities to enhance some poor quality home videos
+and to convert them into PAL frame rate.  I do not have any real
+experience on video processing so be warned that I am probably doing lot
+of things wrong with these utilities.  However, these utilities made it
+possible for me to easily improve the quality of my home videos (as part
+of automated scripted preprocessing before authoring them into a DVD) so
+I was thinking someone else might find them useful too.
+
+Let me shortly introduce the included programs.
+
+yuvinfo
+  displays information about YUV4MPEG streams. Optionally also produces
+  YUV histograms and inserts them into the video stream as overlays.
+
+yuvadjust
+  automatically adjusts luminance level, contrast and white balance of
+  YUV4MPEG streams.  Luminance and colors are adjusted based on the gray
+  world assumption (i.e. assuming the content is 50% gray on average).
+  This can be used to enhance poor quality video material such as too dark
+  or reddish/blueish video.  It probably does more harm than good on high
+  quality material, though.
+  
+yuvresample
+  resamples a video stream for a different frame rate, optionally
+  changing the interlacing mode as well.  Yuvresample does not simply
+  drop or duplicate input frames like yuvfps from the MJPEG tools
+  package does.  It produces output frames or fields using the weighted
+  average of the two temporally closest input frames or fields.  This
+  eliminates much of the visible stepping that occurs when frames are
+  dropped or duplicated.  The drawback is that fast moving objects get
+  blurred.  However, I personally prefer the output of yuvresample when
+  downsampling videos from 30 FPS (my digital camera) to 25 FPS (PAL).
+  Your mileage may vary.  This utility can also be used to create slow
+  motion or speed up effects.
+
+The latest version of this software can be obtained from JL yuvutils
+web page [2].
+
+[1] http://mjpeg.sourceforge.net/
+[2] http://www.iki.fi/jle/yuvutils/
+
+
+LICENSE
+-------
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+
+See the file COPYING for details.
+
+
+BUILDING
+--------
+
+On a standard Linux system (and hopefully also on other Unix-like systems)
+you should be able to build the software using the supplied Makefile
+assuming you have MJPEG tools package[1] installed. This software was
+developed against MJPEG tools version 1.8.0.
+
+Build the software using:
+
+  make
+  
+Optionally, you can also specify the path to MJPEG tools headers and the
+mjpegutils library by giving make the following arguments:
+
+  MJPEGTOOLS_INCLUDE_PATH=-I/somewhere/include/mjpegtools  
+  MJPEGTOOLS_LIBMJPEGUTILS=/somewhere/lib/libmjpegutils.so
+  
+The default is to search for headers in /usr/local/include/mjpegtools
+(in addition to the default include path) and to use -lmjpegutils for
+the library.
+
+The software can be installed either by manually copying the binaries
+"yuvinfo", "yuvadjust" and "yuvresample" and the corresponding man
+pages from the "man" subdirectory or by doing:
+
+  make install
+  
+This will install the software under /usr/local/bin and /usr/local/man.
+You can change the installation location using the standard variables:
+
+  prefix=<top-level prefix>
+  exec_prefix=<top-level prefix for binaries>
+  bindir=<directory for binaries>
+  mandir=<directory for man pages>
+  DESTDIR=<use this directory as the root directory>
+
+[1] http://mjpeg.sourceforge.net/
+
+
+AUTHOR
+------
+
+Author of this software is Johannes Lehtinen <johannes.lehtinen@iki.fi>.
+Feel free to contact me if you have any feedback, bug fixes or suggestions
+regarding this software.
+
+These utilities use MJPEG tools package[1] to read and write YUV4MPEG
+video streams.
+
+[1] http://mjpeg.sourceforge.net/
+
+
+30 December 2005
+Halikko, Finland
+
+Johannes Lehtinen
+<johannes.lehtinen@iki.fi>
