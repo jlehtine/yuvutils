@@ -72,7 +72,8 @@ COPYRIGHT "\n"
 "Describes a YUV4MPEG stream read from the standard input using an output\n"
 "format similar to lavinfo. Optionally copies the input to the standard output\n"
 "and can also overlay YUV histograms in the output video stream.\n"
-"\n"
+"\n", stdout);
+				fputs(
 "usage: " PROGNAME " [-h] [-l] [-c] [-H]\n"
 "options:\n"
 "  -h     print this help text and exit\n"

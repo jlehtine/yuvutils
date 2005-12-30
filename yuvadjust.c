@@ -187,19 +187,22 @@ COPYRIGHT "\n"
 "a YUV4MPEG stream. The input stream is read from the standard input and the\n"
 "adjusted stream is written to the standard output. The stream is adjusted\n"
 "according to the gray world assumption.\n"
-"\n"
+"\n", stdout);
+				fputs(
 "This tool can be used to quickly enhance video which is too dark or which is\n"
 "blueish or reddish. A typical example would be a video recorded in a dimly\n"
 "lighted room. However, because the gray world assumption is not valid\n"
 "for all content, the result might also be worse, especially when applied to\n"
 "high quality input. It is a good idea to experiment and to compare the result\n"
 "to the original (see also the -H option).\n"
-"\n"
+"\n", stdout);
+				fputs(
 "usage: " PROGNAME " command... [option...]\n"
 "commands:\n"
 "  -l       adjust luminance level and contrast\n"
 "  -w       adjust white balance (conflicts with -W)\n"
-"  -W       adjust white balance and color contrast (conflicts with -w)\n"
+"  -W       adjust white balance and color contrast (conflicts with -w)\n", stdout);
+				fputs(
 "options:\n"
 "  -h       print this help text and exit\n"
 "  -b NUM   use information from up to NUM surrounding frames to adjust\n"
