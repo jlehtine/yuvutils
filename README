@@ -70,10 +70,10 @@ See the file COPYING for details.
 BUILDING
 --------
 
-On a standard Linux system (and hopefully also on other Unix-like systems)
-you should be able to build the software using the supplied Makefile
-assuming you have MJPEG tools package[1] installed. This software was
-developed against MJPEG tools version 1.8.0.
+On a standard Linux system (and hopefully also on other Unix-like systems
+if you have GNU tools installed) you should be able to build the software
+using the supplied Makefile assuming you have MJPEG tools[1] installed.
+This software was developed against MJPEG tools version 1.8.0.
 
 Build the software using:
 

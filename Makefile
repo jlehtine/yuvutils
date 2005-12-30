@@ -48,6 +48,8 @@ dist:
 	cp $(BINARIES:=.c) Makefile README COPYING '$(package_tarnamever)'
 	mkdir '$(package_tarnamever)/man'
 	cp man/*.1 '$(package_tarnamever)/man'
+	mkdir '$(package_tarnamever)/html'
+	cp html/*.html '$(package_tarnamever)/html'
 	tar cf '$(package_tarnamever).tar' '$(package_tarnamever)'
 	rm -rf '$(package_tarnamever)'
 	gzip '$(package_tarnamever).tar'
