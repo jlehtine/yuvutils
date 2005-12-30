@@ -3,6 +3,7 @@
 yuvresample \- a resampler for YUV4MPEG streams
 .SH SYNOPSIS
 .B yuvresample
+.RB [ -h ]
 .RB [ -f
 .IR rate ]
 .RB [ -F
@@ -51,14 +52,12 @@ lav2yuv input.avi | yuvresample -i b | yuv2lav -o output.avi
 .TP
 .B \-h
 Print brief usage information and exit immediately.
-
 .TP
 .B \-f \fIrate\fP
 Specify the output frame rate as a ratio.
 For example, 25:1 for PAL or
 30000:1001 for NTCS.
 Defaults to the input frame rate.
-
 .TP
 .B \-F \fIrate\fP
 Override the input frame rate by the specified frame rate ratio.
@@ -68,7 +67,6 @@ If you wish to just change the frame rate information of the stream
 then see
 .BR yuvfps (1)
 option -c.
-
 .TP
 .B \-i \fIinterlacing\fP
 Specify the output interlacing mode.
@@ -83,13 +81,11 @@ The possible values are:
 .br
 .B b
 \- bottom-field first
-
 .TP
 .B \-I \fIinterlacing\fP
 Override the input interlacing mode by the specified mode.
 This can be used if the interlacing information for the input is incorrect.
 The possible values are same as for -i.
-
 .TP
 .B \-m \fImode\fP
 Specify the resampling mode to be used when producing an output frame/field.
@@ -100,18 +96,17 @@ The possible values are:
 .br
 .B a
 \- use the weighted average of two input frames/fields
-
 .TP
 .B \-v
 Be more verbose.
-
 .TP
 .B \-d
 Enables debug output.
 Implies -v.
 .SH SEE ALSO
 .BR mjpegtools (1),
-.BR yuvfps (1)
+.BR yuvfps (1),
+.BR yuv4mpeg (5)
 .SH BUGS
 .B yuvresample
 does not try to account for motion. Motion compensation would reduce blurring

@@ -49,7 +49,6 @@ luminance of the surrounding frames and then applying a quadratic transformation
 which preserves nominal black and white values while mapping the current
 average luminance value to 50% gray.
 Notice that the resulting average luminance is not necessarily 50% gray.
-
 .TP
 .B \-w
 Adjust white balance.
@@ -57,7 +56,6 @@ The Cb/Cr values of a frame are adjusted independently by calculating the
 average Cb/Cr values of the surrounding frames and then shifting the Cb/Cr
 values by constant amount so that the resulting stream is gray on average.
 Conflicts with -W.
-
 .TP
 .B \-W
 Adjust white balance and color contrast.
@@ -67,24 +65,20 @@ transformation which preserves nominal minimum and maximum values while mapping
 the current average color to gray.
 Notice that the resulting average color is not necessarily gray.
 Conflicts with -w.
-
 .TP
 .B \-h
 Print brief usage information and exit immediately.
-
 .TP
 .B \-b \fIframes\fP
 Use information from up to \fIframes\fP buffered surrounding frames to
 adjust a frame.
 Default is 30 frames.
-
 .TP
 .B \-H
 Adjust only the top half of each frame.
 This makes it easy to compare the resulting video to the original.
 More detailed analysis can be done using \fByuvinfo\fP(1) with the -H option
 to display YUV histograms of the original and resulting streams.
-
 .TP
 .B \-c
 Clip output YUV values to their nominal range (16 to 235 for Y, 16 to 240 for
@@ -92,18 +86,17 @@ U and V).
 This does not affect the way adjustments are done, clipping is performed as a
 post-processing step.
 Default is to use the full 8-bit range.
-
 .TP
 .B \-v
 Be more verbose (writes extra information to standard error).
-
 .TP
 .B \-d
 Enables debug output (writes debug information to standard error).
 Use this option to see the exact adjustments done for each frame.
 Implies -v.
 .SH SEE ALSO
-.BR mjpegtools (1)
+.BR mjpegtools (1),
+.BR yuv4mpeg (5)
 .SH BUGS
 .B yuvadjust
 depends fully on the gray world assumption and there is no logic which

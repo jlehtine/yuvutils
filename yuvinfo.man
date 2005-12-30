@@ -36,24 +36,22 @@ lav2yuv video.avi | yuvinfo \-H | yuvplay
 .TP
 .B \-h
 Print brief usage information and exit immediately.
-
 .TP
 .B \-l
 Output only the length of the stream as number of frames.
 This can be used in scripts to easily obtain the length of a stream.
-
 .TP
 .B \-c
 Copy the input to the standard output and write information to the
 standard error.
 This option makes it easy to record information about video stream as it is
 been processed or encoded.
-
 .TP
 .B \-H
 Overlay YUV histograms in the output video stream. Implies -c.
 .SH SEE ALSO
-.BR mjpegtools (1)
+.BR mjpegtools (1),
+.BR yuv4mpeg (5)
 .SH AUTHOR
 .B yuvinfo
 was implemented by Johannes Lehtinen.
