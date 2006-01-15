@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <getopt.h>
 #include <assert.h>
 #include <yuv4mpeg.h>
 
@@ -315,8 +315,7 @@ COPYRIGHT "\n"
 "Each output frame/field is produced as the weighted average of the two\n"
 "temporally closest input frames/fields. Optionally, the closest frame/field\n"
 "can be used as the single source.\n"
-"\n", stdout);
-				fputs(
+"\n"
 "usage: " PROGNAME " [<option>...]\n"
 "options:\n"
 "  -h       print this help text and exit\n"
@@ -325,8 +324,7 @@ COPYRIGHT "\n"
 "  -i I     output interlacing mode (defaults to the input mode)\n"
 "             p - progressive\n"
 "             t - top field first\n"
-"             b - bottom field first\n", stdout);
-				fputs(
+"             b - bottom field first\n"
 "  -I I     input interlacing mode (overrides source stream info)\n"
 "  -m M     source frame selection mode (defaults to 'a')\n"
 "             c - the closest input frame/field\n"

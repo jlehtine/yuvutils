@@ -29,12 +29,14 @@
 #define MIN_UV 16
 #define MAX_UV 240
 
+#define PI 3.14159265358979323846
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <getopt.h>
 #include <yuv4mpeg.h>
 
 static y4m_stream_info_t stream_info;
@@ -59,7 +61,7 @@ int main(int argc, char *argv[]) {
 	int i;
 	
 	/* Initialize calculated constants */
-	sqrt2pi = sqrt(2 * M_PI);
+	sqrt2pi = sqrt(2 * PI);
 	
 	/* Read options */
 	while ((i = getopt(argc, argv, "hlcH")) != -1) {
@@ -72,8 +74,7 @@ COPYRIGHT "\n"
 "Describes a YUV4MPEG stream read from the standard input using an output\n"
 "format similar to lavinfo. Optionally copies the input to the standard output\n"
 "and can also overlay YUV histograms in the output video stream.\n"
-"\n", stdout);
-				fputs(
+"\n"
 "usage: " PROGNAME " [-h] [-l] [-c] [-H]\n"
 "options:\n"
 "  -h     print this help text and exit\n"

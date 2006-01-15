@@ -12,7 +12,7 @@ mandir = $(prefix)/man
 srcdir = .
 
 CC = gcc
-CFLAGS = -O2 -Wall -pedantic
+CFLAGS = -O2 -Wall -pedantic -std=c99
 CPPFLAGS = -DNDEBUG $(MJPEGTOOLS_INCLUDE_PATH)
 LIBS = $(MJPEGTOOLS_LIBMJPEGUTILS) -lm
 VPATH = $(srcdir)
