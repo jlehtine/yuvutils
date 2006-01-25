@@ -17,7 +17,7 @@ CPPFLAGS = -DNDEBUG $(MJPEGTOOLS_INCLUDE_PATH)
 LIBS = $(MJPEGTOOLS_LIBMJPEGUTILS) -lm
 VPATH = $(srcdir)
 
-BINARIES = yuvresample yuvinfo yuvadjust
+BINARIES = yuvresample yuvinfo yuvadjust yuvcut
 
 all: $(BINARIES)
 

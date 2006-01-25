@@ -1,7 +1,7 @@
 ABOUT
 -----
 
-This is JL yuvutils version 1.0.  It includes three small utility
+This is JL yuvutils version 1.1.  It includes four small utility
 programs for processing YUV4MPEG video streams as produced and consumed
 by the tools included in the MJPEG tools package[1].
 
@@ -18,6 +18,10 @@ Let me shortly introduce the included programs.
 yuvinfo
   displays information about YUV4MPEG streams. Optionally also produces
   YUV histograms and inserts them into the video stream as overlays.
+
+yuvcut
+  cuts selected ranges of frames from a YUV4MPEG stream. The ranges can
+  be specified as absolute frame numbers or by using time code format.
 
 yuvadjust
   automatically adjusts luminance level, contrast and white balance of
@@ -39,6 +43,10 @@ yuvresample
   downsampling videos from 30 FPS (my digital camera) to 25 FPS (PAL).
   Your mileage may vary.  This utility can also be used to create slow
   motion or speed up effects.
+  
+  Obsolete: The same weighted average resampling code has also been
+  included in the CVS version of yuvfps since 8 January 2006 (see
+  the -w option).
 
 The latest version of this software can be obtained from JL yuvutils
 web page [2].
@@ -90,8 +98,8 @@ The default is to search for headers in /usr/local/include/mjpegtools
 the library.
 
 The software can be installed either by manually copying the binaries
-"yuvinfo", "yuvadjust" and "yuvresample" and the corresponding man
-pages from the "man" subdirectory or by doing:
+"yuvinfo", "yuvcut", "yuvadjust" and "yuvresample" and the corresponding
+man pages from the "man" subdirectory or by doing:
 
   make install
   
@@ -120,7 +128,7 @@ video streams.
 [1] http://mjpeg.sourceforge.net/
 
 
-30 December 2005
+25 January 2006
 Halikko, Finland
 
 Johannes Lehtinen

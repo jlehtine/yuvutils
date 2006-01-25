@@ -1,0 +1,53 @@
+.TH "yuvcut" 1 "25 January 2006" "Johannes Lehtinen" "JL yuvutils"
+.SH NAME
+yuvcut \- cuts a slice of a YUV4MPEG stream
+.SH SYNOPSIS
+.B yuvcut
+.RB [ -h ]
+.RB [ -c \ [ START ] - [[ + ] END ][ , [ + ] START- [[ + ] END ]]...]
+.RB [ -v ]
+.SH DESCRIPTION
+Reads a YUV4MPEG stream from the standard input and outputs the selected ranges of frames to the standard output.
+A range can be specified using frame indexes (starting at 0) or using time code format [H:]MIN:SEC[.F] (optional hours, minutes, seconds and optional frame index).
+If start/end location starts with '+' it is interpreted relative to the previously specified location.
+If the start/end location is omitted then start/end of stream is assumed.
+The ranges must not be overlapping and they must be specified in order.
+.SH EXAMPLES
+.B Cut the first 100 frames (frames 0-99) of the input stream:
+.br
+yuvcut -c -99 < input.y4m > output.y4m
+
+.B Cut the frames belonging to the second minute of the input stream:
+.br
+yuvcut -c 1:00-2:00 < input.y4m > output.y4m
+.br
+yuvcut -c 1:00-+1:00 < input.y4m > output.y4m
+
+.B Cut 5 frames starting at 1:15:13:
+.br
+yuvcut -c 1:15:13-1:15:13.4 < input.y4m > output.y4m
+.br
+yuvcut -c 1:15:13-+4 < input.y4m > output.y4m
+
+.B Cut two ranges:
+.br
+yuvcut -c 10-23,40-76 < input.y4m > output.y4m
+.SH OPTIONS
+.TP
+.B \-h
+Print brief usage information and exit immediately.
+.TP
+.BR \-c \ [ START ] - [[ + ] END ][ , [ + ] START- [[ + ] END ]]...
+The ranges of frames to be copied.
+.TP
+.B \-v
+Verbose operation (twice for debug).
+.SH SEE ALSO
+.BR mjpegtools (1),
+.BR yuv4mpeg (5)
+.SH AUTHOR
+.B yuvcut
+was implemented by Johannes Lehtinen.
+It uses the \fBmjpegutils\fP library provided by the
+.BR mjpegtools (1)
+package for reading and writing YUV4MPEG streams.
