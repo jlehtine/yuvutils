@@ -112,6 +112,8 @@ int main(int argc, char *argv[]) {
 	parse_arguments(argc, argv, &range_specs);
 	
 	/* Read the stream header */
+	y4m_allow_unknown_tags(1);
+	y4m_accept_extensions(1);
 	y4m_init_stream_info(&si);
 	if (y4m_read_stream_header(STDIN_FILENO, &si) != Y4M_OK) {
 		mjpeg_error_exit1("error reading stream header");
