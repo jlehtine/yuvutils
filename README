@@ -49,10 +49,10 @@ yuvresample
   the -w option).
 
 The latest version of this software can be obtained from JL yuvutils
-web page [2].
+GitHub repository [2].
 
 [1] http://mjpeg.sourceforge.net/
-[2] http://www.iki.fi/jle/yuvutils/
+[2] https://github.com/jlehtine/yuvutils
 
 
 LICENSE
